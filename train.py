@@ -83,7 +83,8 @@ class Workspace(object):
             while not done:
                 with utils.eval_mode(self.agent):
                     action = self.agent.act(obs, sample=False)
-                obs, reward, done, _ = self.env.step(action)
+                # obs, reward, done, _ = self.env.step(action)
+                obs, reward, done, _, _ = self.env.step(action) # NOTE: Nikhil Add 
                 self.video_recorder.record(self.env)
                 episode_reward += reward
 
@@ -134,7 +135,8 @@ class Workspace(object):
             if self.step >= self.cfg.num_seed_steps:
                 self.agent.update(self.replay_buffer, self.logger, self.step)
 
-            next_obs, reward, done, _ = self.env.step(action)
+            # next_obs, reward, done, _ = self.env.step(action)
+            next_obs, reward, done, _, _ = self.env.step(action) # NOTE: NIKHIL ADD 
 
             # allow infinite bootstrap
             done = float(done)
