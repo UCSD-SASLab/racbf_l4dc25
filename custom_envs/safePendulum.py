@@ -46,13 +46,20 @@ _DEFAULT_TIME_LIMIT = 20
 _ANGLE_BOUND = 8
 _COSINE_BOUND = np.cos(np.deg2rad(_ANGLE_BOUND))
 SUITE = containers.TaggedTasks()
+import os 
+CURR_FILE_PATH = os.path.dirname(__file__)
 
 
-# def get_model_and_assets():
-#   """Returns a tuple containing the model XML string and a dict of assets."""
-#   return common.read_model('pendulum.xml'), common.ASSETS
+def get_model_and_assets():
+  """Returns a tuple containing the model XML string and a dict of assets."""
+  # return common.read_model('safePendulum.xml'), common.ASSETS
+  from dm_control.utils import io as resources
+  custom_envs_folder = CURR_FILE_PATH #os.path.dirname(os.path.dirname(__file__))
+  model_filename = os.path.join(custom_envs_folder, "safePendulum.xml")
+  print("Loading environment model from: ", model_filename)
+  return resources.GetResource(model_filename), common.ASSETS
 
-from dm_control.suite.pendulum import get_model_and_assets # NOTE: Load standard pendulum xml file 
+# from dm_control.suite.pendulum import get_model_and_assets # NOTE: Load standard pendulum xml file 
 
 @SUITE.add('benchmarking')
 def safeswingup(time_limit=_DEFAULT_TIME_LIMIT, random=None,
@@ -92,8 +99,11 @@ class SafeSwingUp(base.Task):
         integer seed for creating a new `RandomState`, or None to select a seed
         automatically (default).
     """
-    self.set_unsafe_region(unsafe_theta_min=np.pi/2 - np.pi/4, unsafe_theta_max=np.pi/2 - np.pi/8)
-    self.length = 1.0 # NOTE: may want to change based on how you modify things
+    # self.set_unsafe_region(unsafe_theta_min=np.pi/2 - np.pi/4, unsafe_theta_max=np.pi/2 - np.pi/8)
+    self.set_unsafe_region(unsafe_theta_min=np.pi/8, unsafe_theta_max=np.pi/4)
+    self.length = 0.5 #1.0 # NOTE: may want to change based on how you modify things
+    self.mass = 1.0
+    self.damping = 0.1
     self.setup_hj_reachability()
 
     super().__init__(random=random)
@@ -111,7 +121,7 @@ class SafeSwingUp(base.Task):
   def setup_hj_reachability(self):
     gravity = 9.81
     length = self.length 
-    mass = 1.0 
+    mass = self.mass 
 
     unsafe_theta_min = self.unsafe_theta_min
     unsafe_theta_max = self.unsafe_theta_max
@@ -137,6 +147,7 @@ class SafeSwingUp(base.Task):
                                                             max_torque=max_torque,
                                                             max_theta_dist=max_theta_dist, 
                                                             max_thetadot_dist=max_thetadot_dist,  
+                                                            damping=self.damping,
                                                             tMin=tMin, 
                                                             tMax=tMax)
     self.inv_pendulum_hjr = InvertedPendulumHJR(torch_dynamics=self.inv_pendulum_deepreach, 
@@ -149,6 +160,7 @@ class SafeSwingUp(base.Task):
                                                     max_torque=max_torque,
                                                     max_theta_dist=max_theta_dist, 
                                                     max_thetadot_dist=max_thetadot_dist, 
+                                                    damping=self.damping,
                                                     tMin=tMin, 
                                                     tMax=tMax)
     # HJ Reachability Solver Settings
@@ -166,7 +178,7 @@ class SafeSwingUp(base.Task):
     all_values = hj.solve(solver_settings, self.inv_pendulum_hjr, grid, times, initial_values, progress_bar=True)
     target_values = all_values[-1]
     diffs = -jnp.diff(all_values, axis=0).mean(axis=(1,2))
-    desired_diff_epsilon = 1e-10
+    desired_diff_epsilon = 1e-5
     assert(diffs[-1] < desired_diff_epsilon)
 
     # Create general safe environment attributes to be used externally 

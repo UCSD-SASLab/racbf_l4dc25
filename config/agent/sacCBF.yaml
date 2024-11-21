@@ -28,7 +28,7 @@ agent:
     # hjr_all_values: ??? # to be specified later
     # hjr_times: ??? # to be specified later
     # obs_to_cbf_state: ??? # to be specified later
-    cbf_alpha_value: 1.0 #0.1 #1.0
+    cbf_alpha_value: 5 # 2.5 #1.0 #0.1 #1.0
     
 double_q_critic:
   class: agent.critic.DoubleQCritic
