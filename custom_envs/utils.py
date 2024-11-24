@@ -16,3 +16,6 @@ sys.path.append(deepreach_path)
 # Deepreach imports 
 from deepreach.dynamics.dynamics import InvertedPendulum as InvertedPendulumDeepreach
 from deepreach.dynamics.dynamics_hjr import InvertedPendulum as InvertedPendulumHJR
+
+from deepreach.dynamics.dynamics import CartPole as CartPoleDeepreach
+from deepreach.dynamics.dynamics_hjr import CartPole as CartPoleHJR
