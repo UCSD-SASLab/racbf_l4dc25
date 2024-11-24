@@ -226,6 +226,21 @@ class SafeSwingUp(base.Task):
       return True 
     else: 
       return False 
+    
+  def is_unsafe_physics(self, physics): 
+    """
+    Returns boolean if the pendulum is in the unsafe region
+    args: 
+      - obs: observation 
+        - 'orientation'
+        - 'velocity'
+    """
+    # NOTE: for our purposes: 0 is on top, pi/2 is on the right, pi is on the bottom, -pi/2 is on the left
+    current_theta = (physics.named.data.qpos[0] + np.pi) % (2*np.pi) - np.pi
+    if self.unsafe_theta_min <= current_theta and current_theta <= self.unsafe_theta_max: 
+      return True 
+    else: 
+      return False 
 
   def initialize_episode(self, physics):
     """Sets the state of the environment at the start of each episode.
