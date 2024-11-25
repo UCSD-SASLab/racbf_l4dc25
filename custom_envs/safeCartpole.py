@@ -237,9 +237,9 @@ class Balance(base.Task):
     hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
 
     # Dynamics attributes
-    gravity= -9.8
+    gravity= 9.8 #-9.8
     umax=10
-    length=0.5
+    length=1.0 #0.5
     mass_cart=1.0
     mass_pole=0.1
     
