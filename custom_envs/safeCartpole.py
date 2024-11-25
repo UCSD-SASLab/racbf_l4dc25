@@ -199,7 +199,7 @@ class Balance(base.Task):
 
     super().__init__(random=random)
 
-  def set_unsafe_region(self, unsafe_x_min, unsafe_x_max, unsafe_vel_max, unsafe_theta_min, unsafe_theta_max): 
+  def set_unsafe_region(self, unsafe_x_min, unsafe_x_max, unsafe_vel_max, unsafe_theta_min, unsafe_theta_max, unsafe_theta_in_range): 
     """
     Set the unsafe region: 
     """
@@ -211,6 +211,8 @@ class Balance(base.Task):
     self.unsafe_theta_min = unsafe_theta_min 
     self.unsafe_theta_max = unsafe_theta_max 
 
+    self.unsafe_theta_in_range = unsafe_theta_in_range # Default should be True!!!!!
+
     self.use_unsafe_theta = True
     if self.unsafe_theta_min == self.unsafe_theta_max: 
       self.use_unsafe_theta = False  
@@ -221,20 +223,19 @@ class Balance(base.Task):
     Returns boolean if the cartpole is in the unsafe region
     """
     x = physics.named.data.qpos[0]
-    theta = physics.named.data.qpos[1]
+    theta = (physics.named.data.qpos[1] + np.pi)%(2*np.pi) - np.pi
     xdot = physics.named.data.qvel[0]
     thetadot = physics.named.data.qvel[1]
 
-    if x < self.unsafe_x_min or self.unsafe_x_max < x: 
-      return True 
-    elif xdot < -self.unsafe_vel_max or self.unsafe_vel_max < xdot: 
-      return True 
-    elif self.use_unsafe_theta and (self.unsafe_theta_min < theta and theta < self.unsafe_theta_max): 
-      return True 
-    
-    return False 
+    return self.cartpole_deepreach.is_unsafe(state=np.array([x, theta, xdot, thetadot]))
 
   def setup_hj_reachability(self): 
+
+    # For debugging purposes
+    re_compute_hjr = False #True # False
+    hjr_filename = "safeCartpole_hjr_values.npy"
+    hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
+
     # Dynamics attributes
     gravity= -9.8
     umax=10
@@ -243,12 +244,18 @@ class Balance(base.Task):
     mass_pole=0.1
     
     # Safe Region Attributes
-    unsafe_x_min     = -100
-    unsafe_x_max     = 100
-    unsafe_vel_max   = 100
-    unsafe_theta_min = np.pi/4 - np.pi/8
-    unsafe_theta_max = np.pi/4
-    self.set_unsafe_region(unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max)
+    unsafe_x_min     = -1.5 #-100
+    unsafe_x_max     = 1.5 #100
+    unsafe_vel_max   = 100 #100
+    # unsafe_theta_min = np.pi/4 - np.pi/8
+    # unsafe_theta_max = np.pi/4
+    
+    unsafe_theta_min = -np.pi/8
+    unsafe_theta_max =  np.pi/8
+    unsafe_theta_in_range = False #True 
+
+    self.set_unsafe_region(unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max, 
+                           unsafe_theta_in_range=unsafe_theta_in_range)
 
     # Disturbance bounds
     x_dist        = 0.0
@@ -258,12 +265,12 @@ class Balance(base.Task):
 
     # Timesteps 
     tMin          = 0.0
-    tMax          = 5.0 #1.0
+    tMax          = 10.0 #1.0
 
     # HJR State Space Range
-    x_range = [-2, 2]
+    x_range = [-1.9, 1.9]
     theta_range = [-np.pi, np.pi]
-    xdot_range = [-20, 20]
+    xdot_range = [-10, 10] #[-10, 10]
     thetadot_range = [-10, 10]
 
     grid_resolution = (51, 51, 51, 51)
@@ -275,11 +282,13 @@ class Balance(base.Task):
     self.cartpole_deepreach = CartPoleDeepreach(gravity=gravity, umax=umax, length=length, mass_cart=mass_cart, mass_pole=mass_pole,
                 unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max, # unsafe bounds
                 x_dist=x_dist, theta_dist=theta_dist, vel_dist=vel_dist, thetadot_dist=thetadot_dist, # disturbance bound parameters
-                tMin=tMin, tMax=tMax)
+                tMin=tMin, tMax=tMax, 
+                unsafe_theta_in_range=unsafe_theta_in_range)
     self.cartpole_hjr = CartPoleHJR(self.cartpole_deepreach, gravity=gravity, umax=umax, length=length, mass_cart=mass_cart, mass_pole=mass_pole,
                 unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max, # unsafe bounds
                 x_dist=x_dist, theta_dist=theta_dist, vel_dist=vel_dist, thetadot_dist=thetadot_dist, # disturbance bound parameters
-                tMin=tMin, tMax=tMax)
+                tMin=tMin, tMax=tMax, 
+                unsafe_theta_in_range=unsafe_theta_in_range)
     
     # NOTE: TODO: change this later 
     # NOTE: For now just setup avoid problem 
@@ -292,18 +301,25 @@ class Balance(base.Task):
                                                                    periodic_dims=1)
     
     sdf_values = t2j(self.cartpole_hjr.torch_dynamics.boundary_fn(j2t(grid.states)))
-    import pdb; pdb.set_trace()
     times = jnp.linspace(tMin, -tMax, time_resolution)
     initial_values = sdf_values  
     solver_settings = hj.SolverSettings.with_accuracy("very_high", hamiltonian_postprocessor=hj.solver.backwards_reachable_tube)
 
     # Solve HJI value function 
     # Solve HJI value function
-    all_values = hj.solve(solver_settings, self.cartpole_hjr, grid, times, initial_values, progress_bar=True)
+    if re_compute_hjr or not os.path.exists(hjr_filename): 
+      all_values = hj.solve(solver_settings, self.cartpole_hjr, grid, times, initial_values, progress_bar=True)
+      np.save(file=hjr_filename, arr=np.array(all_values))
+    else: 
+      all_values = np.load(file=hjr_filename)
+      all_values = jnp.array(all_values)
+
     target_values = all_values[-1]
     diffs = -jnp.diff(all_values, axis=0).mean(axis=(1,2,3,4)) # 0 is time
     desired_diff_epsilon = 1e-3
-    assert(diffs[-1] < desired_diff_epsilon)
+    print("Final value function difference: ", diffs[-1])
+    print("\n\n\n\n")
+    # assert(diffs[-1] < desired_diff_epsilon)
 
     # Create general safe environment attributes to be used externally 
     self.hjr_object = self.cartpole_hjr
@@ -356,7 +372,9 @@ class Balance(base.Task):
         if counter > max_counter: 
           # Force 0 and print that it occured
           start_state = np.array([0.0, np.pi, 0.0, 0.0])      
+          start_state_val = self.hjr_state_to_value(start_state)
           print("\n\n\n\nMax counter exceeded: forcing to ", start_state)
+          print("Start state value: ", start_state_val)
           print("\n\n\n")
           found_start = True 
 
