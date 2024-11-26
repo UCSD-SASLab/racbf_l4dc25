@@ -26,7 +26,7 @@ import hydra
 
 # Custom Safe Environments
 import custom_envs 
-from custom_envs import safePendulum 
+from custom_envs import safePendulum, safeCartpole
 
 
 def make_env(cfg):

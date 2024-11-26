@@ -19,6 +19,9 @@ import dmc2gym
 import hydra
 import shutil 
 
+# Custom Safe Environments
+import custom_envs 
+from custom_envs import safePendulum, safeCartpole
 
 def make_env(cfg):
     """Helper function to create dm_control environment"""
