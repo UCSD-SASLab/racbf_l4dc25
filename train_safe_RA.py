@@ -160,11 +160,11 @@ class Workspace(object):
         state_log_path = os.path.join(self.work_dir, "state_logs")
         os.makedirs(state_log_path, exist_ok=True)
 
-        np.save(np.array(self.states), os.path.join(state_log_path, "states.npy"))
-        np.save(np.array(self.times), os.path.join(state_log_path, "times.npy"))
-        np.save(np.array(self.actions), os.path.join(state_log_path, "actions.npy"))
-        np.save(np.array(self.safety_violations), os.path.join(state_log_path, "safety_violations.npy"))
-        np.save(np.array(self.reached_target), os.path.join(state_log_path, "reached_target.npy"))
+        np.save(os.path.join(state_log_path, "states.npy"), np.array(self.states), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "times.npy"), np.array(self.times), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "actions.npy"), np.array(self.actions), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "safety_violations.npy"), np.array(self.safety_violations), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "reached_target.npy"), np.array(self.reached_target), allow_pickle=True)
         return 
 
     def evaluate(self):
