@@ -42,9 +42,9 @@ from torch2jax import t2j, j2t
 import jax 
 import jax.numpy as jnp 
 
+import torch
 
-
-_DEFAULT_TIME_LIMIT = 10
+_DEFAULT_TIME_LIMIT = 20 #10
 SUITE = containers.TaggedTasks()
 CURR_FILE_PATH = os.path.dirname(__file__)
 
@@ -231,9 +231,46 @@ class Balance(base.Task):
 
   def setup_hj_reachability(self): 
 
+    ###################################################
+    # Keep up configuration
+    # # For debugging purposes
+    # re_compute_hjr = False #True # False
+    # hjr_filename = "upright_safeCartpole_hjr_values.npy"
+    # hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
+
+    # # Dynamics attributes
+    # gravity= 9.8 #-9.8
+    # umax=10
+    # length=1.0 #0.5
+    # mass_cart=1.0
+    # mass_pole=0.1
+    
+    # # Safe Region Attributes
+    # unsafe_x_min     = -1.5 #-100
+    # unsafe_x_max     = 1.5 #100
+    # unsafe_vel_max   = 100 #100
+    # # unsafe_theta_min = np.pi/4 - np.pi/8
+    # # unsafe_theta_max = np.pi/4
+    
+    # unsafe_theta_min = -np.pi/8
+    # unsafe_theta_max =  np.pi/8
+    # unsafe_theta_in_range = False #True 
+
+    # # Disturbance bounds
+    # x_dist        = 0.0
+    # theta_dist    = 0.0
+    # vel_dist      = 0.02 #0.2
+    # thetadot_dist = 0.02 #0.2
+
+    # # Timesteps 
+    # tMin          = 0.0
+    # tMax          = 10.0 #1.0
+    ###################################################
+
+    # Unsafe Sliver Configuration
     # For debugging purposes
     re_compute_hjr = False #True # False
-    hjr_filename = "safeCartpole_hjr_values.npy"
+    hjr_filename = "rl_safeCartpole_hjr_values.npy"
     hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
 
     # Dynamics attributes
@@ -244,18 +281,13 @@ class Balance(base.Task):
     mass_pole=0.1
     
     # Safe Region Attributes
-    unsafe_x_min     = -1.5 #-100
-    unsafe_x_max     = 1.5 #100
-    unsafe_vel_max   = 100 #100
-    # unsafe_theta_min = np.pi/4 - np.pi/8
-    # unsafe_theta_max = np.pi/4
+    unsafe_x_min     = -1.5 
+    unsafe_x_max     = 1.5 
+    unsafe_vel_max   = 20 
     
-    unsafe_theta_min = -np.pi/8
-    unsafe_theta_max =  np.pi/8
-    unsafe_theta_in_range = False #True 
-
-    self.set_unsafe_region(unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max, 
-                           unsafe_theta_in_range=unsafe_theta_in_range)
+    unsafe_theta_min = np.pi/8
+    unsafe_theta_max =  np.pi/4
+    unsafe_theta_in_range = True # True = specified theta range is unsafe
 
     # Disturbance bounds
     x_dist        = 0.0
@@ -266,6 +298,10 @@ class Balance(base.Task):
     # Timesteps 
     tMin          = 0.0
     tMax          = 10.0 #1.0
+
+    self.set_unsafe_region(unsafe_x_min=unsafe_x_min, unsafe_x_max=unsafe_x_max, unsafe_vel_max=unsafe_vel_max, unsafe_theta_min=unsafe_theta_min, unsafe_theta_max=unsafe_theta_max, 
+                           unsafe_theta_in_range=unsafe_theta_in_range)
+
 
     # HJR State Space Range
     x_range = [-1.9, 1.9]
@@ -334,6 +370,23 @@ class Balance(base.Task):
 
     return 
 
+  def obs_to_cbfstate(self, obs):
+    if isinstance(obs, torch.Tensor):
+      obs_cpu = obs.cpu().numpy()
+    else: 
+      obs_cpu = np.array(obs)
+
+    x = obs_cpu[..., 0]
+    theta = (np.arctan2(obs_cpu[..., 2], obs_cpu[..., 1]) + np.pi) % (2*np.pi) - np.pi
+    xdot = obs_cpu[..., 3]
+    thetadot = obs_cpu[..., 4]
+    
+    try:
+      state = np.array([x[0], theta[0],xdot[0], thetadot[0]])
+    except: 
+      state = np.array([x, theta, xdot, thetadot])
+    return state 
+  
   def initialize_episode(self, physics):
     """Sets the state of the environment at the start of each episode.
 

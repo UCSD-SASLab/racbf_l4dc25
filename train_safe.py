@@ -23,6 +23,7 @@ import utils
 
 import dmc2gym
 import hydra
+import shutil 
 
 # Custom Safe Environments
 import custom_envs 
@@ -146,6 +147,12 @@ class Workspace(object):
         self.logger.log('eval/episode_reward', average_episode_reward,
                         self.step)
         self.logger.dump(self.step)
+
+        # save the models
+        saved_actor_pth, saved_critic_pth = utils.save_agent(base_dir=self.work_dir, sac_agent=self.agent, step_num=self.step)
+        _, latest_actor_pth, latest_critic_pth = utils.get_model_paths(base_dir=self.work_dir, step_num=None)
+        shutil.copy(saved_actor_pth, latest_actor_pth)
+        shutil.copy(saved_critic_pth, latest_critic_pth)
 
     def run(self):
         episode, episode_reward, done = 0, 0, True
