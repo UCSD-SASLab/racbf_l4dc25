@@ -19,3 +19,6 @@ from deepreach.dynamics.dynamics_hjr import InvertedPendulum as InvertedPendulum
 
 from deepreach.dynamics.dynamics import CartPole as CartPoleDeepreach
 from deepreach.dynamics.dynamics_hjr import CartPole as CartPoleHJR
+
+from deepreach.dynamics.dynamics import BaseCartPole as BaseCartPoleDeepreach
+from deepreach.dynamics.dynamics_hjr import BaseCartPole as BaseCartPoleHJR
