@@ -23,6 +23,8 @@ log_save_tb: true
 # video recorder
 save_video: true
 
+# environment reset policy - True = reset environment, False = start environment at last done point
+force_reset_env: true # false
 
 seed: 1
 
@@ -31,4 +33,4 @@ seed: 1
 hydra:
     name: ${env}
     run:
-        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}

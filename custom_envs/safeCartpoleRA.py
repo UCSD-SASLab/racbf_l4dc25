@@ -171,7 +171,7 @@ class Physics(mujoco.Physics):
                       self.named.data.xmat[2:, ['zz', 'xz']].ravel()))
 
 
-class BalanceRA(BalanceSafeCartpole):
+class BalanceRA(base.Task):
   """A Cartpole `Task` to balance the pole.
 
   State is initialized either close to the target configuration or at a random
@@ -191,15 +191,30 @@ class BalanceRA(BalanceSafeCartpole):
         automatically (default).
     """
 
-    super().__init__(swing_up=swing_up, sparse=sparse, random=random)
+    self.init_in_target = True # Force environment to initialize in target/reach set
+
+    # super().__init__(swing_up=swing_up, sparse=sparse, random=random)
+    self._sparse = sparse
+    self._swing_up = swing_up
+    self.setup_hj_reachability()
 
     # Times for CBF 
     self.max_time = _DEFAULT_TIME_LIMIT 
     self.dt = 0.01
     self.max_iterations = int(self.max_time / self.dt)
     self.return_time = -self.hjr_times[-1] # time to reach target set 
+
+    super().__init__(random=random)
     return 
   
+  def set_init_in_target(self, init_in_target): 
+    """
+    Function to change init_in_target attribute
+    Default: True : forces the environment to initialize in the target reach (reach set)
+             False: environment can initialize in any safe region (positive value for the target time reach avoid value function)
+    """
+    self.init_in_target = init_in_target 
+    return
   
   def set_environment_state(self, physics, state):
     # Force set the environment state 
@@ -223,7 +238,6 @@ class BalanceRA(BalanceSafeCartpole):
                    updated_obs['velocity'][0], updated_obs['velocity'][1]]
     return updated_obs 
   
-
   def get_environment_state(self, physics):
     # Get the environment state - specifically for resetting 
     x = physics.named.data.qpos[0]
@@ -232,7 +246,6 @@ class BalanceRA(BalanceSafeCartpole):
     thetadot = physics.named.data.qvel[1]
     return np.array([x, theta, xdot, thetadot])
 
-  
   def is_unsafe(self, physics): 
     """
     Returns boolean if the cartpole is in the unsafe region
@@ -241,38 +254,64 @@ class BalanceRA(BalanceSafeCartpole):
 
     return self.cartpole_deepreach.is_unsafe(state=np.array([state], dtype=np.float32))  
 
-  def avoid_sdf(sellf, state):
+  def avoid_sdf(self, state):
     # Avoid sdf function 
-    avoid_unsafe_x_min     = -1.5 
-    avoid_unsafe_x_max     = 1.5 
-    avoid_unsafe_vel_max   = 20 
+    self.avoid_unsafe_x_min     = -1.5 
+    self.avoid_unsafe_x_max     = 1.5 
+    self.avoid_unsafe_vel_max   = 20 
     
-    avoid_unsafe_theta_min = np.pi/8
-    avoid_unsafe_theta_max =  np.pi/4
-    avoid_unsafe_thetadot_max = 20
+    self.avoid_unsafe_theta_min = np.pi/8
+    self.avoid_unsafe_theta_max =  np.pi/4
+    self.avoid_unsafe_thetadot_max = 20
 
-    avoid_unsafe_theta_in_range = True # True = specified theta range is unsafe
+    self.avoid_unsafe_theta_in_range = True # True = specified theta range is unsafe
 
-    return cartpole_sdf(state, avoid_unsafe_x_min, avoid_unsafe_x_max, avoid_unsafe_vel_max, avoid_unsafe_theta_min, avoid_unsafe_theta_max, avoid_unsafe_thetadot_max, avoid_unsafe_theta_in_range)
-  
+    return cartpole_sdf(state, self.avoid_unsafe_x_min, self.avoid_unsafe_x_max, self.avoid_unsafe_vel_max, self.avoid_unsafe_theta_min, self.avoid_unsafe_theta_max, self.avoid_unsafe_thetadot_max, self.avoid_unsafe_theta_in_range)
   
   def reach_sdf(self, state):
     # Reach sdf function 
-    reach_unsafe_x_min     = -1.1 #0.15
-    reach_unsafe_x_max     = -0.8 #0.15
-    reach_unsafe_vel_max   = 0.1
+    self.reach_unsafe_x_min     = -1.1 #0.15
+    self.reach_unsafe_x_max     = -0.8 #0.15
+    self.reach_unsafe_vel_max   = 0.1
     
     # reach_unsafe_theta_min = np.pi - 0.25
     # reach_unsafe_theta_max =  np.pi + 0.25
     # reach_unsafe_thetadot_max = 0.25
     # reach_unsafe_theta_in_range = False # False = everywhere outside theta range is unsafe 
 
-    reach_unsafe_theta_min = -np.pi + 0.25
-    reach_unsafe_theta_max =  np.pi - 0.25
-    reach_unsafe_thetadot_max = 0.25
-    reach_unsafe_theta_in_range = True # True = specified theta range is unsafe
+    self.reach_unsafe_theta_min = -np.pi + 0.25
+    self.reach_unsafe_theta_max =  np.pi - 0.25
+    self.reach_unsafe_thetadot_max = 0.25
+    self.reach_unsafe_theta_in_range = True # True = specified theta range is unsafe
     
-    return cartpole_sdf(state, reach_unsafe_x_min, reach_unsafe_x_max, reach_unsafe_vel_max, reach_unsafe_theta_min, reach_unsafe_theta_max, reach_unsafe_thetadot_max, reach_unsafe_theta_in_range)
+    return cartpole_sdf(state, self.reach_unsafe_x_min, self.reach_unsafe_x_max, self.reach_unsafe_vel_max, self.reach_unsafe_theta_min, self.reach_unsafe_theta_max, self.reach_unsafe_thetadot_max, self.reach_unsafe_theta_in_range)
+
+  def sample_state_in_target_set(self): 
+      """
+      Function to sample state in the reach set. 
+      To be used in initializing the environent when force_target_init is True. 
+      args: 
+        - physics: physics object
+      returns: 
+        - state: [x, theta, xdot, thetadot] in the reach set 
+      """
+      self.reach_sdf(state=np.array([[0, 0, 0, 0]], dtype=np.float32)) # force initialization of self.reach_* attributes
+
+      # NOTE: will need to change this if you change the reach set - general way is to sample uniformly and then use the sdf to filter - but inefficient
+      x = np.random.uniform(self.reach_unsafe_x_min, self.reach_unsafe_x_max)
+      if not self.reach_unsafe_theta_in_range: 
+        theta = np.random.uniform(self.reach_unsafe_theta_min, self.reach_unsafe_theta_max)
+      else: 
+        theta_neg = np.random.uniform(-np.pi, self.reach_unsafe_theta_min)
+        theta_pos = np.random.uniform(self.reach_unsafe_theta_max, np.pi)
+        theta = np.random.choice([theta_neg, theta_pos])
+      xdot = np.random.uniform(-self.reach_unsafe_vel_max, self.reach_unsafe_vel_max)
+      thetadot = np.random.uniform(-self.reach_unsafe_thetadot_max, self.reach_unsafe_thetadot_max)
+
+      state = np.array([[x, theta, xdot, thetadot]], dtype=np.float32)
+      assert(self.reach_sdf(state) >= 0)
+
+      return state[0]
 
   def setup_hj_reachability(self): 
 
@@ -363,26 +402,23 @@ class BalanceRA(BalanceSafeCartpole):
 
     return 
   
-
-  def get_observation(self, physics):
-    """Returns an observation of the (bounded) physics state."""
-    obs = collections.OrderedDict()
-    obs['position'] = physics.bounded_position()
-    obs['velocity'] = physics.velocity()
-
-    if self.is_unsafe(physics=physics): 
-      physics.named.model.geom_rgba['pole_1'] = [1, 0, 0, 1] # force red for now
-      physics.named.model.geom_rgba['cart'] = [1, 0, 0, 1] # force red for now
-    elif self.reach_sdf(np.array([self.get_environment_state(physics=physics)], dtype=np.float32)) > 0: # In reach set
-      physics.named.model.geom_rgba['pole_1'] = [0, 0, 1, 1] # force blue for now 
-      physics.named.model.geom_rgba['cart'] = [0, 0, 1, 1] # force blue for now 
+  def obs_to_cbfstate(self, obs):
+    if isinstance(obs, torch.Tensor):
+      obs_cpu = obs.cpu().numpy()
     else: 
-      physics.named.model.geom_rgba['pole_1'] = [0.5, 0.5, 0.5, 1] # default back to beige
-      physics.named.model.geom_rgba['cart'] = [0.5, 0.5, 0.5, 1] # default back to beige
-    return obs
+      obs_cpu = np.array(obs)
 
-
-
+    x = obs_cpu[..., 0]
+    theta = (np.arctan2(obs_cpu[..., 2], obs_cpu[..., 1]) + np.pi) % (2*np.pi) - np.pi
+    xdot = obs_cpu[..., 3]
+    thetadot = obs_cpu[..., 4]
+    
+    try:
+      state = np.array([x[0], theta[0],xdot[0], thetadot[0]])
+    except: 
+      state = np.array([x, theta, xdot, thetadot])
+    return state 
+  
   def initialize_episode(self, physics):
     """Sets the state of the environment at the start of each episode.
 
@@ -400,17 +436,20 @@ class BalanceRA(BalanceSafeCartpole):
 
     # NOTE: right now only support for one pole
     while not found_start: 
-      if self._swing_up: 
-        x = self.random.uniform(-1, 1) #.01*self.random.randn()
-        theta = np.pi + .01*self.random.randn()
+      if self.init_in_target:
+        start_state = self.sample_state_in_target_set()
       else: 
-        x = self.random.uniform(-.1, .1)
-        theta = self.random.uniform(-.034, .034, nv - 1)
+        if self._swing_up: 
+          x = self.random.uniform(-1, 1) #.01*self.random.randn()
+          theta = np.pi + .01*self.random.randn()
+        else: 
+          x = self.random.uniform(-.1, .1)
+          theta = self.random.uniform(-.034, .034, nv - 1)
 
-      xdot = 0.01 * self.random.randn()
-      thetadot = 0.01 * self.random.randn()
+        xdot = 0.01 * self.random.randn()
+        thetadot = 0.01 * self.random.randn()
+        start_state = np.array([x, theta, xdot, thetadot])
 
-      start_state = np.array([x, theta, xdot, thetadot])
       start_state_value = self.hjr_state_to_value(start_state)
 
       if start_state_value >= 0:
@@ -442,3 +481,44 @@ class BalanceRA(BalanceSafeCartpole):
     # physics.named.data.qvel[:] = 0.01 * self.random.randn(physics.model.nv)
 
     super().initialize_episode(physics)
+    # base.Task.initialize_episode(self, physics)
+
+  def get_observation(self, physics):
+    """Returns an observation of the (bounded) physics state."""
+    obs = collections.OrderedDict()
+    obs['position'] = physics.bounded_position()
+    obs['velocity'] = physics.velocity()
+
+    if self.is_unsafe(physics=physics): 
+      physics.named.model.geom_rgba['pole_1'] = [1, 0, 0, 1] # force red for now
+      physics.named.model.geom_rgba['cart'] = [1, 0, 0, 1] # force red for now
+    elif self.reach_sdf(np.array([self.get_environment_state(physics=physics)], dtype=np.float32)) > 0: # In reach set
+      physics.named.model.geom_rgba['pole_1'] = [0, 0, 1, 1] # force blue for now 
+      physics.named.model.geom_rgba['cart'] = [0, 0, 1, 1] # force blue for now 
+    else: 
+      physics.named.model.geom_rgba['pole_1'] = [0.5, 0.5, 0.5, 1] # default back to beige
+      physics.named.model.geom_rgba['cart'] = [0.5, 0.5, 0.5, 1] # default back to beige
+    return obs
+
+  def _get_reward(self, physics, sparse):
+    if sparse:
+      cart_in_bounds = rewards.tolerance(physics.cart_position(),
+                                         self._CART_RANGE)
+      angle_in_bounds = rewards.tolerance(physics.pole_angle_cosine(),
+                                          self._ANGLE_COSINE_RANGE).prod()
+      return cart_in_bounds * angle_in_bounds
+    else:
+      upright = (physics.pole_angle_cosine() + 1) / 2
+      centered = rewards.tolerance(physics.cart_position(), margin=2)
+      centered = (1 + centered) / 2
+      small_control = rewards.tolerance(physics.control(), margin=1,
+                                        value_at_margin=0,
+                                        sigmoid='quadratic')[0]
+      small_control = (4 + small_control) / 5
+      small_velocity = rewards.tolerance(physics.angular_vel(), margin=5).min()
+      small_velocity = (1 + small_velocity) / 2
+      return upright.mean() * small_control * small_velocity * centered
+
+  def get_reward(self, physics):
+    """Returns a sparse or a smooth reward, as specified in the constructor."""
+    return self._get_reward(physics, sparse=self._sparse)
