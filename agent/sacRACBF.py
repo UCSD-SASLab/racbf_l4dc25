@@ -11,6 +11,7 @@ from agent.sac import SACAgent
 import torch 
 import hydra 
 import utils 
+import numpy as np 
 
 class SACCBFRAAgent(SACAgent):
     """SAC RACBF algorithm."""
@@ -60,7 +61,7 @@ class SACCBFRAAgent(SACAgent):
         self.safety_filter_TI.dynamics.control_dim = 1
         self.safety_filter_TV.dynamics.control_dim = 1
 
-        self.target_time = self.hjr_times[-1]
+        self.target_time = -1 * self.hjr_times[-1]
 
         ############ END: CBF Safety Filter ##############
     
@@ -73,21 +74,30 @@ class SACCBFRAAgent(SACAgent):
         assert action.ndim == 2 and action.shape[0] == 1
         action_np = utils.to_np(action[0])
 
+        scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
+        cbf_state = self.obs_to_cbfstate(obs=obs)
         if time >= self.target_time: 
             # Time Invariant CBF 
-            cbf = self.cbf_TI 
-            safety_filter = self.safety_filter_TI
+            cbf_action, d, boolean = self.safety_filter_TI(state=cbf_state, time=time, nominal_control=scaled_up_action)
         else: 
             # Time Varying CBF
-            cbf = self.cbf_TV
-            safety_filter = self.safety_filter_TV
-        
-        # CBF Safety Filter 
-        cbf_state = self.obs_to_cbfstate(obs=obs)
-        cbf_action, d, boolean = safety_filter(state=cbf_state, time=self.target_time, nominal_control=action_np)
-        cbf_action_delta = cbf_action - action_np 
-        action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
+            cbf_action, d, boolean = self.safety_filter_TV(state=cbf_state, time=time, nominal_control=scaled_up_action)
 
+        cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale down action from hjr range to -1 to 1
+        cbf_action = np.array(cbf_action, dtype=np.float32)
+        action = torch.from_numpy(cbf_action).to(action.device).reshape(action.shape)
         action = action.clamp(*self.action_range).float()
+        
+        # # CBF Safety Filter 
+        # action_input_cbf = action_np * self.hjr_object.umax # NOTE: scale action up from -1 to 1 to hjr range
+        # cbf_state = self.obs_to_cbfstate(obs=obs)
+        # cbf_action, d, boolean = safety_filter(state=cbf_state, time=time, nominal_control=action_input_cbf)
+        # cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale action down from hjr range to -1 to 1
+        # print("cbf action: ", cbf_action)
+        # cbf_action_delta = cbf_action - action_np 
+        # action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
+        # action = action.clamp(*self.action_range).float()
+
+
         assert action.ndim == 2 and action.shape[0] == 1
         return utils.to_np(action[0])
