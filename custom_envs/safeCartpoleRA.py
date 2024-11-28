@@ -265,11 +265,15 @@ class BalanceRA(BalanceSafeCartpole):
     reach_unsafe_x_max     = -0.8 #0.15
     reach_unsafe_vel_max   = 0.1
     
-    reach_unsafe_theta_min = np.pi - 0.25
-    reach_unsafe_theta_max =  np.pi + 0.25
-    reach_unsafe_thetadot_max = 0.25
+    # reach_unsafe_theta_min = np.pi - 0.25
+    # reach_unsafe_theta_max =  np.pi + 0.25
+    # reach_unsafe_thetadot_max = 0.25
+    # reach_unsafe_theta_in_range = False # False = everywhere outside theta range is unsafe 
 
-    reach_unsafe_theta_in_range = False # False = everywhere outside theta range is unsafe 
+    reach_unsafe_theta_min = -np.pi + 0.25
+    reach_unsafe_theta_max =  np.pi - 0.25
+    reach_unsafe_thetadot_max = 0.25
+    reach_unsafe_theta_in_range = True # True = specified theta range is unsafe
     
     return cartpole_sdf(state, reach_unsafe_x_min, reach_unsafe_x_max, reach_unsafe_vel_max, reach_unsafe_theta_min, reach_unsafe_theta_max, reach_unsafe_thetadot_max, reach_unsafe_theta_in_range)
 
@@ -277,7 +281,7 @@ class BalanceRA(BalanceSafeCartpole):
 
     # Unsafe Sliver Configuration
     # For debugging purposes
-    re_compute_hjr = True #True # False
+    re_compute_hjr = False #True #True # False
     hjr_filename = "rl_safeCartpoleRA_hjr_values.npy"
     hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
 
