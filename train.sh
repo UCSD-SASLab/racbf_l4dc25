@@ -8,4 +8,5 @@ export DISPLAY=:99
 #python train.py env=pendulum_swingup seed=21 &>> normal_swingup_logforrange_21.txt
 #python train.py env=cartpole_swingup seed=11
 #python train.py env=cartpole_swingup_sparse seed=11
-python train.py env=safeCartpole_swingup seed=13
+#python train.py env=safeCartpole_swingup seed=13
+python train.py env=safeCartpoleRA_swingup seed=14 eval_frequency=12000

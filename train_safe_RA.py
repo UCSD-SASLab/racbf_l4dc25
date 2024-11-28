@@ -158,7 +158,9 @@ class Workspace(object):
         self.states = []
         self.times = []
         self.actions = []
+        self.rewards = []
         self.safety_violations = []
+
         self.final_states = []
         self.reached_target = []
         
@@ -171,6 +173,7 @@ class Workspace(object):
         np.save(os.path.join(state_log_path, "states.npy"), np.array(self.states), allow_pickle=True)
         np.save(os.path.join(state_log_path, "times.npy"), np.array(self.times), allow_pickle=True)
         np.save(os.path.join(state_log_path, "actions.npy"), np.array(self.actions), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "rewards.npy"), np.array(self.rewards), allow_pickle=True)
         np.save(os.path.join(state_log_path, "safety_violations.npy"), np.array(self.safety_violations), allow_pickle=True)
         np.save(os.path.join(state_log_path, "reached_target.npy"), np.array(self.reached_target), allow_pickle=True)
         np.save(os.path.join(state_log_path, "final_states.npy"), np.array(self.final_states), allow_pickle=True)
@@ -192,24 +195,39 @@ class Workspace(object):
             self.video_recorder.init(enabled=(episode == 0))
             done = False
             episode_reward = 0
+
+            # Setup Loggers
+            curr_episode_states = []
+            curr_episode_times = []
+            curr_episode_actions = []
+            curr_episode_rewards = []
+            curr_episode_safety_violations = []
+
             while not done:
                 with utils.eval_mode(self.agent):
                     action = self.agent.act(obs, time=self.current_t, sample=False)
-                
-                # Update state log: 
-                log_state = self.env.task.get_environment_state(physics=self.env.physics)
-                self.states.append(log_state)
-                self.times.append(self.current_t)
-                self.actions.append(action)
-                self.safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
                 
                 # obs, reward, done, _ = self.env.step(action)
                 obs, reward, done, _, _ = self.env.step(action) # NOTE: Nikhil Add 
                 self.current_t -= self.dt
 
+                # Update state log: 
+                log_state = self.env.task.get_environment_state(physics=self.env.physics)
+                curr_episode_states.append(log_state)
+                curr_episode_times.append(self.current_t)
+                curr_episode_actions.append(action)
+                curr_episode_rewards.append(reward)
+                curr_episode_safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
                 if done: 
                     self.reached_target.append(reached_target(env=self.env))
                     self.final_states.append(self.env.task.get_environment_state(physics=self.env.physics))
+
+                    # Append episode logs 
+                    self.states.append(curr_episode_states)
+                    self.times.append(curr_episode_times)
+                    self.actions.append(curr_episode_actions)
+                    self.rewards.append(curr_episode_rewards)
+                    self.safety_violations.append(curr_episode_safety_violations)
 
                 self.video_recorder.record(self.env)
                 episode_reward += reward
@@ -233,6 +251,14 @@ class Workspace(object):
     def run(self):
         episode, episode_reward, done = 0, 0, True
         start_time = time.time()
+        
+        # Setup Loggers
+        curr_episode_states = []
+        curr_episode_times = []
+        curr_episode_actions = []
+        curr_episode_rewards = []
+        curr_episode_safety_violations = []
+
         while self.step < self.cfg.num_train_steps:
             if done:
                 if self.step > 0:
@@ -263,6 +289,13 @@ class Workspace(object):
                 episode_step = 0
                 episode += 1
 
+                # Setup Loggers
+                curr_episode_states = []
+                curr_episode_times = []
+                curr_episode_actions = []
+                curr_episode_rewards = []
+                curr_episode_safety_violations = []
+
                 self.logger.log('train/episode', episode, self.step)
 
             # sample action for data collection
@@ -276,20 +309,27 @@ class Workspace(object):
             if self.step >= self.cfg.num_seed_steps:
                 self.agent.update(self.replay_buffer, self.logger, self.step)
 
-            # Update state log: 
-            log_state = self.env.task.get_environment_state(physics=self.env.physics)
-            self.states.append(log_state)
-            self.times.append(self.current_t)
-            self.actions.append(action)
-            self.safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
-
             # next_obs, reward, done, _ = self.env.step(action)
             next_obs, reward, done, _, _ = self.env.step(action) # NOTE: NIKHIL ADD 
             self.current_t -= self.dt
 
+            # Update state log: 
+            log_state = self.env.task.get_environment_state(physics=self.env.physics)
+            curr_episode_states.append(log_state)
+            curr_episode_times.append(self.current_t)
+            curr_episode_actions.append(action)
+            curr_episode_rewards.append(reward)
+            curr_episode_safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
             if done: 
                 self.reached_target.append(reached_target(env=self.env))
                 self.final_states.append(self.env.task.get_environment_state(physics=self.env.physics))
+
+                # Append episode logs 
+                self.states.append(curr_episode_states)
+                self.times.append(curr_episode_times)
+                self.actions.append(curr_episode_actions)
+                self.rewards.append(curr_episode_rewards)
+                self.safety_violations.append(curr_episode_safety_violations)
 
             # allow infinite bootstrap
             done = float(done)
