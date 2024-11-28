@@ -237,12 +237,9 @@ class BalanceRA(BalanceSafeCartpole):
     """
     Returns boolean if the cartpole is in the unsafe region
     """
-    x = physics.named.data.qpos[0]
-    theta = (physics.named.data.qpos[1] + np.pi)%(2*np.pi) - np.pi
-    xdot = physics.named.data.qvel[0]
-    thetadot = physics.named.data.qvel[1]
+    state = self.get_environment_state(physics=physics)
 
-    return self.cartpole_deepreach.is_unsafe(state=np.array([[x, theta, xdot, thetadot]], dtype=np.float32))  
+    return self.cartpole_deepreach.is_unsafe(state=np.array([state], dtype=np.float32))  
 
   def avoid_sdf(sellf, state):
     # Avoid sdf function 
@@ -261,7 +258,7 @@ class BalanceRA(BalanceSafeCartpole):
   
   def reach_sdf(self, state):
     # Reach sdf function 
-    reach_unsafe_x_min     = -1 #0.15
+    reach_unsafe_x_min     = -1.1 #0.15
     reach_unsafe_x_max     = -0.8 #0.15
     reach_unsafe_vel_max   = 0.1
     
@@ -293,10 +290,10 @@ class BalanceRA(BalanceSafeCartpole):
     mass_pole=0.1
 
     # Disturbance bounds
-    x_dist        = 0.0
-    theta_dist    = 0.0
-    vel_dist      = 0.02 #0.2
-    thetadot_dist = 0.02 #0.2
+    x_dist        = 0.02 #0.0
+    theta_dist    = 0.02 #0.0
+    vel_dist      = 0.05 #0.02 #0.2
+    thetadot_dist = 0.05 #0.02 #0.2
 
     # Timesteps 
     tMin          = 0.0
@@ -383,3 +380,65 @@ class BalanceRA(BalanceSafeCartpole):
       physics.named.model.geom_rgba['pole_1'] = [0.5, 0.5, 0.5, 1] # default back to beige
       physics.named.model.geom_rgba['cart'] = [0.5, 0.5, 0.5, 1] # default back to beige
     return obs
+
+
+
+  def initialize_episode(self, physics):
+    """Sets the state of the environment at the start of each episode.
+
+    Initializes the cart and pole according to `swing_up`, and in both cases
+    adds a small random initial velocity to break symmetry.
+
+    Args:
+      physics: An instance of `Physics`.
+    """
+    nv = physics.model.nv
+    
+    max_counter = 1000 
+    counter = 0 
+    found_start = False
+
+    # NOTE: right now only support for one pole
+    while not found_start: 
+      if self._swing_up: 
+        x = self.random.uniform(-1, 1) #.01*self.random.randn()
+        theta = np.pi + .01*self.random.randn()
+      else: 
+        x = self.random.uniform(-.1, .1)
+        theta = self.random.uniform(-.034, .034, nv - 1)
+
+      xdot = 0.01 * self.random.randn()
+      thetadot = 0.01 * self.random.randn()
+
+      start_state = np.array([x, theta, xdot, thetadot])
+      start_state_value = self.hjr_state_to_value(start_state)
+
+      if start_state_value >= 0:
+        # safe 
+        found_start = True
+      else: 
+        counter += 1
+        if counter > max_counter: 
+          # Force 0 and print that it occured
+          start_state = np.array([0.0, np.pi, 0.0, 0.0])      
+          start_state_val = self.hjr_state_to_value(start_state)
+          print("\n\n\n\nMax counter exceeded: forcing to ", start_state)
+          print("Start state value: ", start_state_val)
+          print("\n\n\n")
+          found_start = True 
+
+    physics.named.data.qpos['slider'] = start_state[0]
+    physics.named.data.qpos['hinge_1'] = start_state[1]
+    physics.named.data.qvel[0] = start_state[2]
+    physics.named.data.qvel[1] = start_state[3]
+
+    # if self._swing_up:
+    #   physics.named.data.qpos['slider'] = .01*self.random.randn()
+    #   physics.named.data.qpos['hinge_1'] = np.pi + .01*self.random.randn()
+    #   physics.named.data.qpos[2:] = .1*self.random.randn(nv - 2)
+    # else:
+    #   physics.named.data.qpos['slider'] = self.random.uniform(-.1, .1)
+    #   physics.named.data.qpos[1:] = self.random.uniform(-.034, .034, nv - 1)
+    # physics.named.data.qvel[:] = 0.01 * self.random.randn(physics.model.nv)
+
+    super().initialize_episode(physics)

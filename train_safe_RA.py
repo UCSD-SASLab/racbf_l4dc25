@@ -62,7 +62,7 @@ def make_env(cfg):
 
     return env
 
-def reset_environmnent(env):
+def reset_environment(env):
     """
     Reset the environment back to the current state of the environment. 
     args: 
@@ -73,7 +73,31 @@ def reset_environmnent(env):
     state_to_reset = env.task.get_environment_state(physics=env.physics)
     reset_obs = env.reset()
     updated_reset_obs = env.task.set_environment_state(physics=env.physics, state=state_to_reset)
+
+    print("\n")
+    print("State to reset: ", state_to_reset)
+    print(("State it was reset to: ", env.task.get_environment_state(physics=env.physics)))
+
     return env, updated_reset_obs 
+
+def manual_reset_to_target(env): 
+    """
+    Reset the environment back to the target state of the environment. 
+    args: 
+        - env: environment object to reset 
+    returns: 
+        - env: environment object after reset 
+    """
+    # NOTE: just for cartpole - need to figure out how to make this better / more general 
+    x = np.random.uniform(-1, -.8)
+    theta = np.pi + np.random.uniform(-0.25, 0.25)
+    xdot = np.random.uniform(-0.25, 0.25)
+    thetadot = np.random.uniform(-0.1, 0.1)
+    state_to_reset = np.array([x, theta, xdot, thetadot])
+
+    reset_obs = env.reset()
+    updated_reset_obs = env.task.set_environment_state(physics=env.physics, state=state_to_reset)
+    return env, updated_reset_obs
 
 def reached_target(env): 
     # True if reached the target at the end of episode
@@ -94,6 +118,7 @@ class Workspace(object):
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
         self.env = utils.make_env(cfg)
+        self.env.reset() # start with reset 
 
         cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
@@ -152,6 +177,7 @@ class Workspace(object):
         self.times = []
         self.actions = []
         self.safety_violations = []
+        self.final_states = []
         self.reached_target = []
         
     def save_state_logs(self): 
@@ -165,17 +191,18 @@ class Workspace(object):
         np.save(os.path.join(state_log_path, "actions.npy"), np.array(self.actions), allow_pickle=True)
         np.save(os.path.join(state_log_path, "safety_violations.npy"), np.array(self.safety_violations), allow_pickle=True)
         np.save(os.path.join(state_log_path, "reached_target.npy"), np.array(self.reached_target), allow_pickle=True)
+        np.save(os.path.join(state_log_path, "final_states.npy"), np.array(self.final_states), allow_pickle=True)
+
         return 
 
     def evaluate(self):
+        print("\n\nStarting Evaluate Script")
         average_episode_reward = 0
         for episode in range(self.cfg.num_eval_episodes):
 
-            self.reached_target.append(reached_target(env=self.env))
-
             # obs = self.env.reset()
-            self.env, obs = reset_environmnent(self.env)
-            self.agent.reset()
+            self.env, obs = reset_environment(self.env)
+            # self.agent.reset()
             self.current_t = self.env.task.max_time 
 
             self.video_recorder.init(enabled=(episode == 0))
@@ -190,17 +217,22 @@ class Workspace(object):
                 self.states.append(log_state)
                 self.times.append(self.current_t)
                 self.actions.append(action)
-                self.safety_violations.append(log_state)
+                self.safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
                 
                 # obs, reward, done, _ = self.env.step(action)
                 obs, reward, done, _, _ = self.env.step(action) # NOTE: Nikhil Add 
                 self.current_t -= self.dt
+
+                if done: 
+                    self.reached_target.append(reached_target(env=self.env))
+                    self.final_states.append(self.env.task.get_environment_state(physics=self.env.physics))
 
                 self.video_recorder.record(self.env)
                 episode_reward += reward
 
             average_episode_reward += episode_reward
             self.video_recorder.save(f'{self.step}.mp4')
+
         average_episode_reward /= self.cfg.num_eval_episodes
         self.logger.log('eval/episode_reward', average_episode_reward,
                         self.step)
@@ -234,10 +266,11 @@ class Workspace(object):
                 self.logger.log('train/episode_reward', episode_reward,
                                 self.step)
 
-                self.reached_target.append(reached_target(env=self.env))
+
                 # obs = self.env.reset()
-                self.env, obs = reset_environmnent(self.env)
-                self.agent.reset()
+                print("Resetting in training: ")
+                self.env, obs = reset_environment(self.env)
+                # self.agent.reset()
                 self.current_t = self.env.task.max_time
 
                 done = False
@@ -263,11 +296,15 @@ class Workspace(object):
             self.states.append(log_state)
             self.times.append(self.current_t)
             self.actions.append(action)
-            self.safety_violations.append(log_state)
+            self.safety_violations.append(self.env.task.is_unsafe(physics=self.env.physics))
 
             # next_obs, reward, done, _ = self.env.step(action)
             next_obs, reward, done, _, _ = self.env.step(action) # NOTE: NIKHIL ADD 
             self.current_t -= self.dt
+
+            if done: 
+                self.reached_target.append(reached_target(env=self.env))
+                self.final_states.append(self.env.task.get_environment_state(physics=self.env.physics))
 
             # allow infinite bootstrap
             done = float(done)
