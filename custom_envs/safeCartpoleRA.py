@@ -45,7 +45,7 @@ import jax.numpy as jnp
 
 import torch
 
-_DEFAULT_TIME_LIMIT = 20 #10
+_DEFAULT_TIME_LIMIT = 15 #20 #10
 SUITE = containers.TaggedTasks()
 CURR_FILE_PATH = os.path.dirname(__file__)
 
@@ -227,7 +227,7 @@ class BalanceRA(BalanceSafeCartpole):
   def get_environment_state(self, physics):
     # Get the environment state - specifically for resetting 
     x = physics.named.data.qpos[0]
-    theta = physics.named.data.qpos[1]
+    theta = (physics.named.data.qpos[1] + np.pi)%(2*np.pi) - np.pi
     xdot = physics.named.data.qvel[0]
     thetadot = physics.named.data.qvel[1]
     return np.array([x, theta, xdot, thetadot])
@@ -263,11 +263,11 @@ class BalanceRA(BalanceSafeCartpole):
     # Reach sdf function 
     reach_unsafe_x_min     = -1 #0.15
     reach_unsafe_x_max     = -0.8 #0.15
-    reach_unsafe_vel_max   = 0.2
+    reach_unsafe_vel_max   = 0.1
     
-    reach_unsafe_theta_min = np.pi - 0.5
-    reach_unsafe_theta_max =  np.pi + 0.5
-    reach_unsafe_thetadot_max = 0.5
+    reach_unsafe_theta_min = np.pi - 0.25
+    reach_unsafe_theta_max =  np.pi + 0.25
+    reach_unsafe_thetadot_max = 0.25
 
     reach_unsafe_theta_in_range = False # False = everywhere outside theta range is unsafe 
     
@@ -277,7 +277,7 @@ class BalanceRA(BalanceSafeCartpole):
 
     # Unsafe Sliver Configuration
     # For debugging purposes
-    re_compute_hjr = True # False
+    re_compute_hjr = True #True # False
     hjr_filename = "rl_safeCartpoleRA_hjr_values.npy"
     hjr_filename = os.path.join(CURR_FILE_PATH, hjr_filename)
 
@@ -296,7 +296,7 @@ class BalanceRA(BalanceSafeCartpole):
 
     # Timesteps 
     tMin          = 0.0
-    tMax          = 10.0 
+    tMax          = 15.0 
 
     # HJR State Space Range
     x_range = [-1.9, 1.9]
@@ -373,8 +373,8 @@ class BalanceRA(BalanceSafeCartpole):
       physics.named.model.geom_rgba['pole_1'] = [1, 0, 0, 1] # force red for now
       physics.named.model.geom_rgba['cart'] = [1, 0, 0, 1] # force red for now
     elif self.reach_sdf(np.array([self.get_environment_state(physics=physics)], dtype=np.float32)) > 0: # In reach set
-      physics.named.model.geom_rgba['pole_1'] = [1, 0, 1, 1] # force purple for now 
-      physics.named.model.geom_rgba['cart'] = [1, 0, 1, 1] # force purple for now 
+      physics.named.model.geom_rgba['pole_1'] = [0, 0, 1, 1] # force blue for now 
+      physics.named.model.geom_rgba['cart'] = [0, 0, 1, 1] # force blue for now 
     else: 
       physics.named.model.geom_rgba['pole_1'] = [0.5, 0.5, 0.5, 1] # default back to beige
       physics.named.model.geom_rgba['cart'] = [0.5, 0.5, 0.5, 1] # default back to beige
