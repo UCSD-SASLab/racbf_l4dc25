@@ -2,7 +2,8 @@ import sys
 import os 
 
 # Deepreach path: abstract away imports from deepreach 
-deepreach_path = os.path.join(os.getcwd(), "../../")
+# deepreach_path = os.path.join(os.getcwd(), "../../")
+deepreach_path = os.path.join(os.path.dirname(__file__), "../../../")
 try: 
     assert("deepreach" in os.listdir(deepreach_path))
 except AssertionError as e: 
