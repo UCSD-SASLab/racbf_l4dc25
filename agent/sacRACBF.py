@@ -85,8 +85,11 @@ class SACCBFRAAgent(SACAgent):
 
         cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale down action from hjr range to -1 to 1
         cbf_action = np.array(cbf_action, dtype=np.float32)
-        action = torch.from_numpy(cbf_action).to(action.device).reshape(action.shape)
+        cbf_action_delta = cbf_action - action_np 
+        action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
         action = action.clamp(*self.action_range).float()
+        # action = torch.from_numpy(cbf_action).to(action.device).reshape(action.shape)
+        # action = action.clamp(*self.action_range).float()
         
         # # CBF Safety Filter 
         # action_input_cbf = action_np * self.hjr_object.umax # NOTE: scale action up from -1 to 1 to hjr range

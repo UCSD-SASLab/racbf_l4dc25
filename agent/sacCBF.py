@@ -195,8 +195,11 @@ class SACCBFAgent(Agent):
         # NOTE: this is only if it is the inverted pendulum environment for now 
         ################# START: CBF Safety Filter ################
         action_np = action.detach().cpu().numpy()
+        scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
         cbf_state = self.obs_to_cbfstate(obs=obs)
-        cbf_action, d, boolean = self.safety_filter(state=cbf_state, time=self.target_time, nominal_control=action_np)
+        cbf_action, d, boolean = self.safety_filter(state=cbf_state, time=self.target_time, nominal_control=scaled_up_action)
+        cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale down action from hjr range to -1 to 1
+        cbf_action = np.array(cbf_action, dtype=np.float32)
         cbf_action_delta = cbf_action - action_np 
         action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
 
