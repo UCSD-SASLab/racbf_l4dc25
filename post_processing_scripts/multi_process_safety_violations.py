@@ -131,8 +131,12 @@ def avg_safety_violations_perepisode(file_groups, labels, imgs_dir):
     # Plotting Line Plot
     plt.figure(figsize=(10, 6))
     x = range(len(avg_safety_violations_per_episode))
+    print("Episodes where safety violations occur:")
     for i, avg_safety_violations in enumerate(all_avg_safety_violations_lineplot): 
         plt.plot(x, avg_safety_violations, label=labels[i])
+        print(f"{labels[i]}: {np.where(np.array(avg_safety_violations[:, 0])>0)}")
+        print()
+    print("Done with printing episodes where safety violations occur.\n\n")
     plt.xlabel('Episodes')
     plt.ylabel('Average Safety Violations per Episode')
     plt.title('Average Safety Violations per Episode Across Groups')
