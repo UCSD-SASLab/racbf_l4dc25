@@ -7,8 +7,14 @@ export DISPLAY=:105
 #python train_safe.py env=safePendulum_safeswingup seed=14
 #python train_safe.py env=safePendulum_safeswingup seed=15
 #python train_safe.py env=safeCartpole_swingup seed=14
-python train_safe.py env=safeCartpoleAvoid_swingup seed=13 eval_frequency=12000 num_train_steps=200000
-python train_safe.py env=safeCartpoleAvoid_swingup seed=23 eval_frequency=12000 num_train_steps=200000
-python train_safe.py env=safeCartpoleAvoid_swingup seed=33 eval_frequency=12000 num_train_steps=200000
-python train_safe.py env=safeCartpoleAvoid_swingup seed=43 eval_frequency=12000 num_train_steps=200000
-python train_safe.py env=safeCartpoleAvoid_swingup seed=53 eval_frequency=12000 num_train_steps=200000
+# python train_safe.py env=safeCartpoleAvoid_swingup seed=13 eval_frequency=12000 num_train_steps=200000
+# python train_safe.py env=safeCartpoleAvoid_swingup seed=23 eval_frequency=12000 num_train_steps=200000
+# python train_safe.py env=safeCartpoleAvoid_swingup seed=33 eval_frequency=12000 num_train_steps=200000
+# python train_safe.py env=safeCartpoleAvoid_swingup seed=43 eval_frequency=12000 num_train_steps=200000
+# python train_safe.py env=safeCartpoleAvoid_swingup seed=53 eval_frequency=12000 num_train_steps=200000
+
+python train_safe.py env=safeCartpoleAvoid_swingup seed=14 eval_frequency=12000 num_train_steps=200000
+python train_safe.py env=safeCartpoleAvoid_swingup seed=15 eval_frequency=12000 num_train_steps=200000
+python train_safe.py env=safeCartpoleAvoid_swingup seed=16 eval_frequency=12000 num_train_steps=200000
+python train_safe.py env=safeCartpoleAvoid_swingup seed=17 eval_frequency=12000 num_train_steps=200000
+python train_safe.py env=safeCartpoleAvoid_swingup seed=18 eval_frequency=12000 num_train_steps=200000

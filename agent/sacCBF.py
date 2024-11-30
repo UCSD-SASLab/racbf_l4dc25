@@ -184,16 +184,8 @@ class SACCBFAgent(Agent):
     @property
     def alpha(self):
         return self.log_alpha.exp()
-
-    def act(self, obs, sample=False):
-        obs = torch.FloatTensor(obs).to(self.device)
-        obs = obs.unsqueeze(0)
-        dist = self.actor(obs)
-        action = dist.sample() if sample else dist.mean
-        action = action.clamp(*self.action_range)
-
-        # NOTE: this is only if it is the inverted pendulum environment for now 
-        ################# START: CBF Safety Filter ################
+    
+    def cbf_safety_filter(self, obs, action): 
         action_np = action.detach().cpu().numpy()
         scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
         cbf_state = self.obs_to_cbfstate(obs=obs)
@@ -204,6 +196,28 @@ class SACCBFAgent(Agent):
         action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
 
         action = action.clamp(*self.action_range).float()
+        return action
+
+    def act(self, obs, sample=False):
+        obs = torch.FloatTensor(obs).to(self.device)
+        obs = obs.unsqueeze(0)
+        dist = self.actor(obs)
+        action = dist.sample() if sample else dist.mean
+        action = action.clamp(*self.action_range)
+
+        # NOTE: this is only if it is the inverted pendulum environment for now 
+        ################# START: CBF Safety Filter ################
+        # action_np = action.detach().cpu().numpy()
+        # scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
+        # cbf_state = self.obs_to_cbfstate(obs=obs)
+        # cbf_action, d, boolean = self.safety_filter(state=cbf_state, time=self.target_time, nominal_control=scaled_up_action)
+        # cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale down action from hjr range to -1 to 1
+        # cbf_action = np.array(cbf_action, dtype=np.float32)
+        # cbf_action_delta = cbf_action - action_np 
+        # action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
+
+        # action = action.clamp(*self.action_range).float()
+        action = self.cbf_safety_filter(obs, action)
         ################# END: CBF Safety Filter ################
 
         assert action.ndim == 2 and action.shape[0] == 1

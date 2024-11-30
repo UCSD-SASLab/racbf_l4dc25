@@ -66,6 +66,8 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         self.env = utils.make_env(cfg)
 
+        self.safe_pre_seed = cfg.safe_pre_seed
+
         cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
         cfg.agent.params.action_range = [
@@ -256,6 +258,12 @@ class Workspace(object):
             # sample action for data collection
             if self.step < self.cfg.num_seed_steps:
                 action = self.env.action_space.sample()
+                if self.safe_pre_seed: 
+                    safety_filter_obs = torch.FloatTensor(obs).to(self.agent.device)
+                    safety_filter_obs = safety_filter_obs.unsqueeze(0)
+                    action = self.agent.cbf_safety_filter(safety_filter_obs, torch.from_numpy(np.array([action], dtype=np.float32)))
+                    assert action.ndim == 2 and action.shape[0] == 1
+                    action = utils.to_np(action[0])
             else:
                 with utils.eval_mode(self.agent):
                     action = self.agent.act(obs, sample=True)

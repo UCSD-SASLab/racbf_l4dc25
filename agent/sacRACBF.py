@@ -64,14 +64,8 @@ class SACCBFRAAgent(SACAgent):
         self.target_time = -1 * self.hjr_times[-1]
 
         ############ END: CBF Safety Filter ##############
-    
-    def act(self, obs, time, sample=False):
-        obs = torch.FloatTensor(obs).to(self.device)
-        obs = obs.unsqueeze(0)
-        dist = self.actor(obs)
-        action = dist.sample() if sample else dist.mean
-        action = action.clamp(*self.action_range)
-        assert action.ndim == 2 and action.shape[0] == 1
+
+    def cbf_safety_filter(self, obs, action, time):
         action_np = utils.to_np(action[0])
 
         scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
@@ -88,8 +82,38 @@ class SACCBFRAAgent(SACAgent):
         cbf_action_delta = cbf_action - action_np 
         action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
         action = action.clamp(*self.action_range).float()
-        # action = torch.from_numpy(cbf_action).to(action.device).reshape(action.shape)
+        return action 
+    
+    def act(self, obs, time, sample=False):
+        obs = torch.FloatTensor(obs).to(self.device)
+        obs = obs.unsqueeze(0)
+        dist = self.actor(obs)
+        action = dist.sample() if sample else dist.mean
+        action = action.clamp(*self.action_range)
+        assert action.ndim == 2 and action.shape[0] == 1
+
+        ################# START: CBF Safety Filter ################
+        # action_np = utils.to_np(action[0])
+
+        # scaled_up_action = action_np * self.hjr_object.umax # NOTE: scale up action from -1 to 1 to hjr range
+        # cbf_state = self.obs_to_cbfstate(obs=obs)
+        # if time >= self.target_time: 
+        #     # Time Invariant CBF 
+        #     cbf_action, d, boolean = self.safety_filter_TI(state=cbf_state, time=time, nominal_control=scaled_up_action)
+        # else: 
+        #     # Time Varying CBF
+        #     cbf_action, d, boolean = self.safety_filter_TV(state=cbf_state, time=time, nominal_control=scaled_up_action)
+
+        # cbf_action = cbf_action / self.hjr_object.umax # NOTE: scale down action from hjr range to -1 to 1
+        # cbf_action = np.array(cbf_action, dtype=np.float32)
+        # cbf_action_delta = cbf_action - action_np 
+        # action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
         # action = action.clamp(*self.action_range).float()
+        # # action = torch.from_numpy(cbf_action).to(action.device).reshape(action.shape)
+        # # action = action.clamp(*self.action_range).float()
+
+        action = self.cbf_safety_filter(obs=obs, action=action, time=time)
+        ################# END: CBF Safety Filter ################
         
         # # CBF Safety Filter 
         # action_input_cbf = action_np * self.hjr_object.umax # NOTE: scale action up from -1 to 1 to hjr range
@@ -100,6 +124,7 @@ class SACCBFRAAgent(SACAgent):
         # cbf_action_delta = cbf_action - action_np 
         # action = action + torch.from_numpy(cbf_action_delta).to(action.device).reshape(action.shape)
         # action = action.clamp(*self.action_range).float()
+        
 
 
         assert action.ndim == 2 and action.shape[0] == 1

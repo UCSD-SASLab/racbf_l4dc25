@@ -25,6 +25,7 @@ save_video: true
 
 # environment reset policy - True = reset environment, False = start environment at last done point
 force_reset_env: true # false
+safe_pre_seed: true # If True then use safety filter on pre-seed data
 
 seed: 1
 
@@ -33,4 +34,4 @@ seed: 1
 hydra:
     name: ${env}
     run:
-        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}_sp${safe_pre_seed}
