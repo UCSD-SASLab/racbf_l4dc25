@@ -80,6 +80,7 @@ def plot_state_logs(state_logs_dirs, labels, reward_tally_cutoff, imgs_dir, num_
     plt.title('State Logs with Mean and ±2 Standard Deviations')
     plt.grid(True)
     plt.savefig(os.path.join(imgs_dir, "partial_reward_graph.png"))
+    plt.show()
 
     # Print the final episode cumulative rewards
     print("Final Episode Cumulative Rewards")
@@ -93,6 +94,7 @@ def plot_state_logs(state_logs_dirs, labels, reward_tally_cutoff, imgs_dir, num_
 if __name__ == "__main__":
     imgs_dir =  "./images"
     reward_tally_cutoff = 1000 # Cutoff time for the rewards
+    num_std = 1
     os.makedirs(imgs_dir, exist_ok=True)
 
     # base_dir = "../exp/2024.11.28"
@@ -108,6 +110,13 @@ if __name__ == "__main__":
                    # NOTE: TODO: This last group is still incomplete! need to fix this later! 
                    ["0133_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetFalse", "0638_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetFalse", "1142_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetFalse", "1539_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetFalse"]]
     
+    base_dir = "/Users/nikhilushinde/Documents/Grad/research/arclab/RACBF_24/backup_results/all_state_logs_2024.11.29/"
+    directories = [["0908_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetTrue", "0128_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetTrue", "0613_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetTrue", "1030_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetTrue", "1532_safeCartpoleRA_swingup_sacRACBF_swingup_53_5_resetTrue"], 
+                   ["0538_safeCartpoleAvoid_swingup_sacRACBF_swingup_43_5_resetTrue_spFalse", "2156_safeCartpoleAvoid_swingup_sacRACBF_swingup_53_5_resetTrue_spFalse", "1251_safeCartpoleAvoid_swingup_sacRACBF_swingup_33_5_resetTrue_spFalse", "1801_safeCartpoleAvoid_swingup_sacRACBF_swingup_13_5_resetTrue_spFalse", "2023_safeCartpoleAvoid_swingup_sacRACBF_swingup_23_5_resetTrue_spFalse"], #["0130_safeCartpoleAvoid_swingup_sacCBF_safeswingup_13_5", "0339_safeCartpoleAvoid_swingup_sacCBF_safeswingup_23_5", "0544_safeCartpoleAvoid_swingup_sacCBF_safeswingup_33_5", "0747_safeCartpoleAvoid_swingup_sacCBF_safeswingup_43_5", "0952_safeCartpoleAvoid_swingup_sacCBF_safeswingup_53_5"], 
+                   ["0135_safeCartpoleRA_swingup_sac_test_exp_13", "0207_safeCartpoleRA_swingup_sac_test_exp_23", "0240_safeCartpoleRA_swingup_sac_test_exp_33", "0313_safeCartpoleRA_swingup_sac_test_exp_43", "0346_safeCartpoleRA_swingup_sac_test_exp_53"], 
+                   # NOTE: TODO: This last group is still incomplete! need to fix this later! 
+                   ["0133_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetFalse", "0638_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetFalse", "1142_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetFalse", "1539_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetFalse", "2156_safeCartpoleAvoid_swingup_sacRACBF_swingup_53_5_resetTrue_spFalse"]]
+
     post_dir = "state_logs"
 
     # Create full directory names 
@@ -123,5 +132,5 @@ if __name__ == "__main__":
               "sac-racbf-noreset"]
 
     # Call the plotting function
-    plot_state_logs(state_logs_dirs, labels, reward_tally_cutoff=reward_tally_cutoff, imgs_dir=imgs_dir)
+    plot_state_logs(state_logs_dirs, labels, reward_tally_cutoff=reward_tally_cutoff, imgs_dir=imgs_dir, num_std=num_std)
     print("State logs plotted successfully.")
