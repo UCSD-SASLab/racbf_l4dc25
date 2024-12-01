@@ -28,7 +28,12 @@ def write_data_to_file(x, mean, std_dev, filename, num_std=2):
             f.write(f"{float(x[i]):.6e} {float(mean[i]):.6e} {c1:.6e} {c2:.6e}\n")
     return
 
-def get_delta_from_target(final_states): 
+def get_delta_from_target(final_states, abs_delta_x): 
+    """
+    args: 
+        - final_states: (num episodes, final state dim)
+        - abs_delta_x: if True, then take the absolute value of the delta x
+    """
     # Define Target Region
     x_range = [-1.1, -0.8]
     not_target_theta_range = [-np.pi + 0.25, np.pi - 0.25] # If in this range then not in the target - other ranges describe target set
@@ -38,8 +43,12 @@ def get_delta_from_target(final_states):
     # Compute the deltas
     x = final_states[:, 0]
     x_delta = np.zeros_like(x)
-    x_delta[np.where(x<x_range[0])] = x[np.where(x<x_range[0])] - x_range[0]
-    x_delta[np.where(x>x_range[1])] = x[np.where(x>x_range[1])] - x_range[1]
+    if abs_delta_x:
+        x_delta[np.where(x<x_range[0])] = np.abs(x[np.where(x<x_range[0])] - x_range[0])
+        x_delta[np.where(x>x_range[1])] = np.abs(x[np.where(x>x_range[1])] - x_range[1])
+    else: 
+        x_delta[np.where(x<x_range[0])] = x[np.where(x<x_range[0])] - x_range[0]
+        x_delta[np.where(x>x_range[1])] = x[np.where(x>x_range[1])] - x_range[1]
 
     theta = final_states[:, 1]
     theta_delta = np.zeros_like(theta)
@@ -77,7 +86,7 @@ def get_sublist_mean_std(sublist_states):
     std_dev = np.std(sublist_states, axis=0)
     return mean, std_dev
 
-def plot_combined_scatterplot(labels, all_means, all_stds, img_title, img_folder, delta_state, num_stds=2):
+def plot_combined_scatterplot(labels, all_means, all_stds, img_title, img_folder, delta_state, abs_delta_x, num_stds=2):
     """
     args: 
         - labels: list of labels for each sublist
@@ -105,8 +114,12 @@ def plot_combined_scatterplot(labels, all_means, all_stds, img_title, img_folder
         axs[0, 0].fill_between(range(len(means)), means[:, 0] - num_stds * stds[:, 0], means[:, 0] + num_stds * stds[:, 0], color=color, alpha=0.2)
         axs[0, 0].set_xlabel("Episodes")
         if do_delta:
-            axs[0, 0].set_title("Delta x from Target")
-            axs[0, 0].set_ylabel("Delta x")
+            if abs_delta_x:
+                axs[0, 0].set_title("|Delta x| from Target")
+                axs[0, 0].set_ylabel("|Delta x|")
+            else: 
+                axs[0, 0].set_title("Delta x from Target")
+                axs[0, 0].set_ylabel("Delta x")
         else:
             axs[0, 0].set_title("State x")
             axs[0, 0].set_ylabel("x")
@@ -159,7 +172,10 @@ def plot_combined_scatterplot(labels, all_means, all_stds, img_title, img_folder
 
     # Save the combined figure
     if delta_state: 
-        img_path = os.path.join(img_folder, "combined_final_states_scatterplot_delta.png")
+        if abs_delta_x: 
+            img_path = os.path.join(img_folder, "combined_final_states_scatterplot_delta_absdx.png")
+        else: 
+            img_path = os.path.join(img_folder, "combined_final_states_scatterplot_delta.png")
     else:
         img_path = os.path.join(img_folder, "combined_final_states_scatterplot_2.png")
     plt.savefig(img_path)
@@ -169,14 +185,22 @@ def plot_combined_scatterplot(labels, all_means, all_stds, img_title, img_folder
 
 if __name__ == "__main__":
     do_delta = True 
+    abs_delta_x = False
     num_stds = 1
+
+    # base_dir = "/Users/nikhilushinde/Documents/Grad/research/arclab/RACBF_24/backup_results/all_state_logs_2024.11.29/"
+    # directories = [["0908_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetTrue", "0128_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetTrue", "0613_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetTrue", "1030_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetTrue", "1532_safeCartpoleRA_swingup_sacRACBF_swingup_53_5_resetTrue"], 
+    #                ["0538_safeCartpoleAvoid_swingup_sacRACBF_swingup_43_5_resetTrue_spFalse", "2156_safeCartpoleAvoid_swingup_sacRACBF_swingup_53_5_resetTrue_spFalse"], #["0130_safeCartpoleAvoid_swingup_sacCBF_safeswingup_13_5", "0339_safeCartpoleAvoid_swingup_sacCBF_safeswingup_23_5", "0544_safeCartpoleAvoid_swingup_sacCBF_safeswingup_33_5", "0747_safeCartpoleAvoid_swingup_sacCBF_safeswingup_43_5", "0952_safeCartpoleAvoid_swingup_sacCBF_safeswingup_53_5"], 
+    #                ["0135_safeCartpoleRA_swingup_sac_test_exp_13", "0207_safeCartpoleRA_swingup_sac_test_exp_23", "0240_safeCartpoleRA_swingup_sac_test_exp_33", "0313_safeCartpoleRA_swingup_sac_test_exp_43", "0346_safeCartpoleRA_swingup_sac_test_exp_53"], 
+    #                # NOTE: TODO: This last group is still incomplete! need to fix this later! 
+    #                ["0133_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetFalse", "0638_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetFalse", "1142_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetFalse", "1539_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetFalse"]]
 
     base_dir = "/Users/nikhilushinde/Documents/Grad/research/arclab/RACBF_24/backup_results/all_state_logs_2024.11.29/"
     directories = [["0908_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetTrue", "0128_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetTrue", "0613_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetTrue", "1030_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetTrue", "1532_safeCartpoleRA_swingup_sacRACBF_swingup_53_5_resetTrue"], 
-                   ["0538_safeCartpoleAvoid_swingup_sacRACBF_swingup_43_5_resetTrue_spFalse", "2156_safeCartpoleAvoid_swingup_sacRACBF_swingup_53_5_resetTrue_spFalse"], #["0130_safeCartpoleAvoid_swingup_sacCBF_safeswingup_13_5", "0339_safeCartpoleAvoid_swingup_sacCBF_safeswingup_23_5", "0544_safeCartpoleAvoid_swingup_sacCBF_safeswingup_33_5", "0747_safeCartpoleAvoid_swingup_sacCBF_safeswingup_43_5", "0952_safeCartpoleAvoid_swingup_sacCBF_safeswingup_53_5"], 
+                   ["0538_safeCartpoleAvoid_swingup_sacRACBF_swingup_43_5_resetTrue_spFalse", "2156_safeCartpoleAvoid_swingup_sacRACBF_swingup_53_5_resetTrue_spFalse", "1251_safeCartpoleAvoid_swingup_sacRACBF_swingup_33_5_resetTrue_spFalse", "1801_safeCartpoleAvoid_swingup_sacRACBF_swingup_13_5_resetTrue_spFalse", "2023_safeCartpoleAvoid_swingup_sacRACBF_swingup_23_5_resetTrue_spFalse"], #["0130_safeCartpoleAvoid_swingup_sacCBF_safeswingup_13_5", "0339_safeCartpoleAvoid_swingup_sacCBF_safeswingup_23_5", "0544_safeCartpoleAvoid_swingup_sacCBF_safeswingup_33_5", "0747_safeCartpoleAvoid_swingup_sacCBF_safeswingup_43_5", "0952_safeCartpoleAvoid_swingup_sacCBF_safeswingup_53_5"], 
                    ["0135_safeCartpoleRA_swingup_sac_test_exp_13", "0207_safeCartpoleRA_swingup_sac_test_exp_23", "0240_safeCartpoleRA_swingup_sac_test_exp_33", "0313_safeCartpoleRA_swingup_sac_test_exp_43", "0346_safeCartpoleRA_swingup_sac_test_exp_53"], 
                    # NOTE: TODO: This last group is still incomplete! need to fix this later! 
-                   ["0133_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetFalse", "0638_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetFalse", "1142_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetFalse", "1539_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetFalse"]]
+                   ["0133_safeCartpoleRA_swingup_sacRACBF_swingup_13_5_resetFalse", "0638_safeCartpoleRA_swingup_sacRACBF_swingup_23_5_resetFalse", "1142_safeCartpoleRA_swingup_sacRACBF_swingup_33_5_resetFalse", "1539_safeCartpoleRA_swingup_sacRACBF_swingup_43_5_resetFalse", ]]
 
     for sub_dir_num in range(len(directories)):
         for sub_sub_dir_num in range(len(directories[sub_dir_num])): 
@@ -218,7 +242,7 @@ if __name__ == "__main__":
             final_states = np.load(final_states_file, allow_pickle=True)
             if do_delta: 
                 normal_final_states = deepcopy(final_states)
-                final_states = get_delta_from_target(final_states)
+                final_states = get_delta_from_target(final_states, abs_delta_x=abs_delta_x)
             
             # if i >= 2: 
             #     print(label)
@@ -251,5 +275,6 @@ if __name__ == "__main__":
         img_title="Combined Final States Scatterplot",
         img_folder=imgs_dir, 
         delta_state=do_delta,
+        abs_delta_x=abs_delta_x,
         num_stds=num_stds
     )
