@@ -12,7 +12,7 @@ replay_buffer_capacity: ${num_train_steps}
 num_seed_steps: 5000
 
 eval_frequency: 10000
-num_eval_episodes: 10
+num_eval_episodes: 5
 
 device: cuda
 
@@ -23,6 +23,7 @@ log_save_tb: true
 # video recorder
 save_video: true
 
+force_reset_env: true # false
 safe_pre_seed: true # If True then use safety filter on pre-seed data
 
 
@@ -33,4 +34,4 @@ seed: 1
 hydra:
     name: ${env}
     run:
-        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_sp${safe_pre_seed}
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}_sp${safe_pre_seed}

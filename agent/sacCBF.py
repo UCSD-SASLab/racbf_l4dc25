@@ -148,7 +148,7 @@ class SACCBFAgent(Agent):
         # assert(diffs[-1] < desired_diff_epsilon)
 
         from cbf_opt_kit.cbf import HJReachabilityControlAffineCBF
-        from cbf_opt_kit.safety_filter import ControlAffineSafetyFilter
+        from cbf_opt_kit.safety_filter import ControlAffineSafetyFilter, OptimalControl
 
         # Create CBF Safety Filter
         class ReachabilityModel:
@@ -168,7 +168,8 @@ class SACCBFAgent(Agent):
 
         model = ReachabilityModel(grid=self.hjr_grid, grid_values=self.hjr_all_values[-1], times=self.hjr_times)
         cbf = HJReachabilityControlAffineCBF(dynamics=self.hjr_object, model=model, time_invariant=True)
-        safety_filter = ControlAffineSafetyFilter(cbf, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True)
+        backup_filter = OptimalControl(cbf)
+        safety_filter = ControlAffineSafetyFilter(cbf, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True, backup_filter=backup_filter)
         safety_filter.dynamics.control_dim = 1
 
         self.target_time = self.hjr_times[-1]

@@ -58,6 +58,8 @@ class Workspace(object):
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
         self.env = utils.make_env(cfg)
+        self.env.reset() # start with reset
+        self.force_reset_env = cfg.force_reset_env
 
         cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
@@ -73,7 +75,7 @@ class Workspace(object):
                                           self.device)
 
         self.video_recorder = VideoRecorder(
-            self.work_dir if cfg.save_video else None)
+            self.work_dir if cfg.save_video else None, height=360, width=640)
         self.step = 0
 
         # Setup Logging 
@@ -146,7 +148,7 @@ class Workspace(object):
                 episode_reward += reward
 
             average_episode_reward += episode_reward
-            self.video_recorder.save(f'{self.step}.mp4')
+            self.video_recorder.save(f'{self.step}_{episode}.mp4')
         average_episode_reward /= self.cfg.num_eval_episodes
         self.logger.log('eval/episode_reward', average_episode_reward,
                         self.step)
@@ -185,12 +187,15 @@ class Workspace(object):
                 if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
                     self.logger.log('eval/episode', episode, self.step)
                     self.evaluate()
+                    self.env.reset()  # reset env after evaluation for consistency
 
                 self.logger.log('train/episode_reward', episode_reward,
                                 self.step)
-
-                obs = self.env.reset()
-                self.agent.reset()
+                if self.force_reset_env:
+                    obs = self.env.reset()
+                else:
+                    self.env, obs = reset_environment(self.env) # reset to last episode end state
+                # self.agent.reset()
                 done = False
                 episode_reward = 0
                 episode_step = 0
@@ -248,6 +253,25 @@ class Workspace(object):
             obs = next_obs
             episode_step += 1
             self.step += 1
+
+
+def reset_environment(env):
+    """
+    Reset the environment back to the current state of the environment. 
+    args: 
+        - env: environment object to reset 
+    returns: 
+        - env: environment object after reset 
+    """
+    state_to_reset = env.task.get_environment_state(physics=env.physics)
+    reset_obs = env.reset()
+    updated_reset_obs = env.task.set_environment_state(physics=env.physics, state=state_to_reset)
+
+    print("\n")
+    print("State to reset: ", state_to_reset)
+    print(("State it was reset to: ", env.task.get_environment_state(physics=env.physics)))
+
+    return env, updated_reset_obs 
 
 
 @hydra.main(config_path='config/train.yaml', strict=True)

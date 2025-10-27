@@ -45,7 +45,7 @@ import jax.numpy as jnp
 
 import torch
 
-_DEFAULT_TIME_LIMIT = 15 #20 #10
+_DEFAULT_TIME_LIMIT = 10 #20 #10
 SUITE = containers.TaggedTasks()
 CURR_FILE_PATH = os.path.dirname(__file__)
 
@@ -336,7 +336,7 @@ class BalanceRA(base.Task):
 
     # Timesteps 
     tMin          = 0.0
-    tMax          = 15.0 
+    tMax          = 10.0 
 
     # HJR State Space Range
     x_range = [-1.9, 1.9]

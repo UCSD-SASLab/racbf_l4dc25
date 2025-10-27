@@ -153,7 +153,7 @@ class Workspace(object):
                                           self.device)
 
         self.video_recorder = VideoRecorder(
-            self.work_dir if cfg.save_video else None, height=480, width=480)
+            self.work_dir if cfg.save_video else None, height=360, width=640)
         self.step = 0
 
         # Setup Logging 
@@ -187,11 +187,7 @@ class Workspace(object):
         average_episode_reward = 0
         for episode in range(self.cfg.num_eval_episodes):
 
-            if self.force_reset_env: 
-                obs = self.env.reset()
-            else:
-                self.env, obs = reset_environment(self.env) # reset to last episode end state 
-            # self.agent.reset()
+            obs = self.env.reset()
             self.current_t = self.env.task.max_time 
 
             self.video_recorder.init(enabled=(episode == 0))
@@ -235,7 +231,7 @@ class Workspace(object):
                 episode_reward += reward
 
             average_episode_reward += episode_reward
-            self.video_recorder.save(f'{self.step}.mp4')
+            self.video_recorder.save(f'{self.step}_{episode}.mp4')
 
         average_episode_reward /= self.cfg.num_eval_episodes
         self.logger.log('eval/episode_reward', average_episode_reward,
@@ -274,6 +270,7 @@ class Workspace(object):
                 if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
                     self.logger.log('eval/episode', episode, self.step)
                     self.evaluate()
+                    self.env.reset()  # reset env after evaluation for consistency
 
                 self.logger.log('train/episode_reward', episode_reward,
                                 self.step)

@@ -78,7 +78,7 @@ class BalanceAvoid(BalanceRA):
 
     # Timesteps 
     tMin          = 0.0
-    tMax          = 15.0 
+    tMax          = 10.0 
 
     # HJR State Space Range
     x_range = [-1.9, 1.9]

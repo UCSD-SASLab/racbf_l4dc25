@@ -32,7 +32,7 @@ class SACCBFRAAgent(SACAgent):
                  batch_size, learnable_temperature)
 
         from cbf_opt_kit.cbf import HJReachabilityControlAffineCBF
-        from cbf_opt_kit.safety_filter import ControlAffineSafetyFilter
+        from cbf_opt_kit.safety_filter import ControlAffineSafetyFilter, OptimalControl
 
         # Create CBF Safety Filter
         class ReachabilityModel:
@@ -55,9 +55,10 @@ class SACCBFRAAgent(SACAgent):
 
         self.cbf_TI = HJReachabilityControlAffineCBF(dynamics=self.hjr_object, model=time_invariant_model, time_invariant=True) # Time Invariant 
         self.cbf_TV = HJReachabilityControlAffineCBF(dynamics=self.hjr_object, model=time_varying_model, time_invariant=False) # Time Varying
-
-        self.safety_filter_TI = ControlAffineSafetyFilter(self.cbf_TI, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True, verbose=False)
-        self.safety_filter_TV = ControlAffineSafetyFilter(self.cbf_TV, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True, verbose=False)
+        backup_filter_TI = OptimalControl(self.cbf_TI)
+        backup_filter_TV = OptimalControl(self.cbf_TV)
+        self.safety_filter_TI = ControlAffineSafetyFilter(self.cbf_TI, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True, verbose=False, backup_filter=backup_filter_TI)
+        self.safety_filter_TV = ControlAffineSafetyFilter(self.cbf_TV, alpha = lambda x: self.cbf_alpha_value * x, limit_controls=True, verbose=False, backup_filter=backup_filter_TV)
         self.safety_filter_TI.dynamics.control_dim = 1
         self.safety_filter_TV.dynamics.control_dim = 1
 

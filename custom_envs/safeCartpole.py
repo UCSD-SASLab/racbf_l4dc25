@@ -44,7 +44,7 @@ import jax.numpy as jnp
 
 import torch
 
-_DEFAULT_TIME_LIMIT = 20 #10
+_DEFAULT_TIME_LIMIT = 10 #10
 SUITE = containers.TaggedTasks()
 CURR_FILE_PATH = os.path.dirname(__file__)
 
