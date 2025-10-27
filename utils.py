@@ -129,3 +129,127 @@ def to_np(t):
         return np.array([])
     else:
         return t.cpu().detach().numpy()
+
+
+################## NIKHIL ADDED ##################
+
+def get_model_paths(base_dir, step_num=None): 
+    model_save_folder = os.path.join(base_dir, "models")
+    if step_num is None: 
+        actor_pth = os.path.join(model_save_folder, "actor.pth")
+        critic_pth = os.path.join(model_save_folder, "critic.pth")
+    else: 
+        actor_pth = os.path.join(model_save_folder, f"actor_{step_num}.pth")
+        critic_pth = os.path.join(model_save_folder, f"critic_{step_num}.pth")
+    return model_save_folder, actor_pth, critic_pth
+
+def save_agent(base_dir, sac_agent, step_num=None):
+    """
+    args: 
+        - base_dir: the experiment directory where all the results of the experiment are located
+        - sac_agent: the sac agent to save
+    returns: 
+        - actor_pth
+        - critic_pth
+    """
+    model_save_folder, actor_pth, critic_pth = get_model_paths(base_dir, step_num=step_num)
+    os.makedirs(model_save_folder, exist_ok=True)
+
+    torch.save(sac_agent.actor.state_dict(), actor_pth)
+    torch.save(sac_agent.critic.state_dict(), critic_pth)
+    print("Saving actor to: ", actor_pth)
+    print("Saving critic to: ", critic_pth)
+
+    return actor_pth, critic_pth
+
+def load_agent(base_dir, sac_agent, step_num=None): 
+    """
+    args: 
+        - base_dir: the experiment directory where all the results of the experiment were located
+    returns: 
+        - sac_agent: agent with loaded actor and critic networks
+    """
+    model_save_folder, actor_pth, critic_pth = get_model_paths(base_dir, step_num)
+    sac_agent.actor.load_state_dict(torch.load(actor_pth))
+    sac_agent.critic.load_state_dict(torch.load(critic_pth))
+
+    return sac_agent
+
+from omegaconf import OmegaConf
+import hydra 
+def create_and_load_sac_agent(experiment_dir, env): 
+    """
+    Given an experiment folder: 
+    1. Create a sac agent with the config file 
+    2. load the actor and critic models in the sac agent 
+    3. return the sac agent for use
+    args: 
+        - experiment_dir: the experiment directory
+        - env: environment - necessary to complete configuration for sac agent
+    """
+    config_file = os.path.join(experiment_dir, ".hydra/config.yaml")
+    cfg = OmegaConf.load(config_file)
+
+    cfg.agent.params.obs_dim = env.observation_space.shape[0]
+    cfg.agent.params.action_dim = env.action_space.shape[0]
+    cfg.agent.params.action_range = [
+        float(env.action_space.low.min()), 
+        float(env.action_space.high.max())
+    ]
+
+    agent = hydra.utils.instantiate(cfg.agent)
+    agent = load_agent(base_dir=experiment_dir, sac_agent=agent)
+
+    return agent 
+
+def create_and_load_sacCBF_agent(experiment_dir, env): 
+    """
+    Given an experiment folder: 
+    1. Create a sacCBF agent with the config file
+    2. load the actor and critic models in the sacCBF agent 
+    3. return the sacCBF agent for use 
+    args: 
+        - experiment_dir: the experiment directory
+        - env: environment - necessary to complete configuration for sac agent
+    """
+    config_file = os.path.join(experiment_dir, ".hydra/config.yaml")
+    cfg = OmegaConf.load(config_file)
+
+    cfg.agent.params.obs_dim = env.observation_space.shape[0]
+    cfg.agent.params.action_dim = env.action_space.shape[0]
+    cfg.agent.params.action_range = [
+        float(env.action_space.low.min()),
+        float(env.action_space.high.max())
+    ]
+
+    agent_class = hydra.utils.get_class(cfg.agent["class"])
+    agent = agent_class(obs_dim=cfg.agent.params.obs_dim, 
+                        action_dim=cfg.agent.params.action_dim, 
+                        action_range=cfg.agent.params.action_range, 
+                        device=cfg.agent.params.device, 
+                        critic_cfg=cfg.agent.params.critic_cfg, 
+                        actor_cfg=cfg.agent.params.actor_cfg, 
+                        discount=cfg.agent.params.discount, 
+                        init_temperature=cfg.agent.params.init_temperature, 
+                        alpha_lr=cfg.agent.params.alpha_lr, 
+                        alpha_betas=cfg.agent.params.alpha_betas, 
+                        actor_lr=cfg.agent.params.actor_lr, 
+                        actor_betas=cfg.agent.params.actor_betas,
+                        actor_update_frequency=cfg.agent.params.actor_update_frequency, 
+                        critic_lr=cfg.agent.params.critic_lr, 
+                        critic_betas=cfg.agent.params.critic_betas, 
+                        critic_tau=cfg.agent.params.critic_tau, 
+                        critic_target_update_frequency=cfg.agent.params.critic_target_update_frequency, 
+                        batch_size=cfg.agent.params.batch_size, 
+                        learnable_temperature=cfg.agent.params.learnable_temperature, 
+                        deepreach_object=env.task.deepreach_object, 
+                        hjr_object=env.task.hjr_object, 
+                        hjr_grid=env.task.hjr_grid, 
+                        hjr_all_values=env.task.hjr_all_values, 
+                        hjr_times=env.task.hjr_times, 
+                        obs_to_cbfstate=env.task.obs_to_cbfstate, 
+                        cbf_alpha_value=cfg.agent.params.cbf_alpha_value)
+    
+    agent = load_agent(base_dir=experiment_dir, sac_agent=agent)
+
+    return agent 

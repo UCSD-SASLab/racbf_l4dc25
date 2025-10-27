@@ -1,3 +1,9 @@
+"""
+Train file for training with safe environments: 
+Main differences: 
+    - environments: have hj reachability based attributes to enable safe initialization
+    - agents: perform actions with safety filters using the environment's hj reachability attributes. 
+"""
 #!/usr/bin/env python3
 import numpy as np
 import torch
@@ -22,6 +28,7 @@ import shutil
 # Custom Safe Environments
 import custom_envs 
 from custom_envs import safePendulum, safeCartpole
+
 
 def make_env(cfg):
     """Helper function to create dm_control environment"""
@@ -60,6 +67,7 @@ class Workspace(object):
         self.env = utils.make_env(cfg)
         self.env.reset() # start with reset
         self.force_reset_env = cfg.force_reset_env
+        self.safe_pre_seed = cfg.safe_pre_seed
 
         cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
@@ -67,7 +75,49 @@ class Workspace(object):
             float(self.env.action_space.low.min()),
             float(self.env.action_space.high.max())
         ]
-        self.agent = hydra.utils.instantiate(cfg.agent)
+
+        ############ START: CBF Safety Specific ############
+        # Assign safety configuration parameters
+        # NOTE: cfg wants a primitive so doing the below approach
+        # cfg.deepreach_object = self.env.task.deepreach_object
+        # cfg.hjr_object = self.env.task.hjr_object
+        # cfg.hjr_grid = self.env.task.hjr_grid
+        # cfg.hjr_all_values = self.env.task.hjr_all_values
+        # cfg.hjr_times = self.env.task.hjr_times
+        # cfg.obs_to_cbf_state = self.env.task.obs_to_cbf_state
+
+        agent_class = hydra.utils.get_class(cfg.agent["class"])
+        self.agent = agent_class(obs_dim=cfg.agent.params.obs_dim, 
+                                 action_dim=cfg.agent.params.action_dim, 
+                                 action_range=cfg.agent.params.action_range, 
+                                 device=cfg.agent.params.device, 
+                                 critic_cfg=cfg.agent.params.critic_cfg, 
+                                 actor_cfg=cfg.agent.params.actor_cfg, 
+                                 discount=cfg.agent.params.discount, 
+                                 init_temperature=cfg.agent.params.init_temperature, 
+                                 alpha_lr=cfg.agent.params.alpha_lr, 
+                                 alpha_betas=cfg.agent.params.alpha_betas, 
+                                 actor_lr=cfg.agent.params.actor_lr, 
+                                 actor_betas=cfg.agent.params.actor_betas,
+                                 actor_update_frequency=cfg.agent.params.actor_update_frequency, 
+                                 critic_lr=cfg.agent.params.critic_lr, 
+                                 critic_betas=cfg.agent.params.critic_betas, 
+                                 critic_tau=cfg.agent.params.critic_tau, 
+                                 critic_target_update_frequency=cfg.agent.params.critic_target_update_frequency, 
+                                 batch_size=cfg.agent.params.batch_size, 
+                                 learnable_temperature=cfg.agent.params.learnable_temperature, 
+                                 deepreach_object=self.env.task.deepreach_object, 
+                                 hjr_object=self.env.task.hjr_object, 
+                                 hjr_grid=self.env.task.hjr_grid, 
+                                 hjr_all_values=self.env.task.hjr_all_values, 
+                                 hjr_times=self.env.task.hjr_times, 
+                                 obs_to_cbfstate=self.env.task.obs_to_cbfstate, 
+                                 cbf_alpha_value=cfg.agent.params.cbf_alpha_value)
+
+        # self.agent = hydra.utils.instantiate(cfg.agent, deepreach_object=self.env.task.deepreach_object, hjr_object=self.env.task.hjr_object, hjr_grid=self.env.task.hjr_grid, hjr_all_values=self.env.task.hjr_all_values, hjr_times=self.env.task.hjr_times, obs_to_cbf_stat=self.env.task.obs_to_cbf_state)
+        ############ END: CBF Safety Specific ############
+
+        # self.agent = hydra.utils.instantiate(cfg.agent, hjr_dict)
 
         self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
                                           self.env.action_space.shape,
@@ -125,7 +175,7 @@ class Workspace(object):
                     action = self.agent.act(obs, sample=False)
                 # obs, reward, done, _ = self.env.step(action)
                 obs, reward, done, _, _ = self.env.step(action) # NOTE: Nikhil Add 
-
+                
                 # Update state log: 
                 log_state = self.env.task.get_environment_state(physics=self.env.physics)
                 curr_episode_states.append(log_state)
@@ -162,11 +212,10 @@ class Workspace(object):
 
         self.save_state_logs()
 
-
     def run(self):
         episode, episode_reward, done = 0, 0, True
         start_time = time.time()
-        
+
         # Setup Loggers
         curr_episode_states = []
         # curr_episode_times = []
@@ -191,11 +240,12 @@ class Workspace(object):
 
                 self.logger.log('train/episode_reward', episode_reward,
                                 self.step)
+
                 if self.force_reset_env:
                     obs = self.env.reset()
                 else:
                     self.env, obs = reset_environment(self.env) # reset to last episode end state
-                # self.agent.reset()
+                self.agent.reset()
                 done = False
                 episode_reward = 0
                 episode_step = 0
@@ -213,6 +263,12 @@ class Workspace(object):
             # sample action for data collection
             if self.step < self.cfg.num_seed_steps:
                 action = self.env.action_space.sample()
+                if self.safe_pre_seed: 
+                    safety_filter_obs = torch.FloatTensor(obs).to(self.agent.device)
+                    safety_filter_obs = safety_filter_obs.unsqueeze(0)
+                    action = self.agent.cbf_safety_filter(safety_filter_obs, torch.from_numpy(np.array([action], dtype=np.float32)))
+                    assert action.ndim == 2 and action.shape[0] == 1
+                    action = utils.to_np(action[0])
             else:
                 with utils.eval_mode(self.agent):
                     action = self.agent.act(obs, sample=True)
@@ -274,7 +330,7 @@ def reset_environment(env):
     return env, updated_reset_obs 
 
 
-@hydra.main(config_path='config/train.yaml', strict=True)
+@hydra.main(config_path='config/train_safe.yaml', strict=True)
 def main(cfg):
     workspace = Workspace(cfg)
     workspace.run()

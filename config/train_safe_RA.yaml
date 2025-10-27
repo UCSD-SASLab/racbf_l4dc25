@@ -1,0 +1,37 @@
+defaults:
+    - agent: sacRACBF # sac
+
+env: safeCartpoleRA #cheetah_run
+
+# this needs to be specified manually
+experiment: swingup #test_exp
+
+num_train_steps: 1e6
+replay_buffer_capacity: ${num_train_steps}
+
+num_seed_steps: 5000
+
+eval_frequency: 12000 #10000
+num_eval_episodes: 5
+
+device: cuda
+
+# logger
+log_frequency: 10000
+log_save_tb: true
+
+# video recorder
+save_video: true
+
+# environment reset policy - True = reset environment, False = start environment at last done point
+force_reset_env: true # false
+safe_pre_seed: true # If True then use safety filter on pre-seed data
+
+seed: 1
+
+
+# hydra configuration
+hydra:
+    name: ${env}
+    run:
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}_sp${safe_pre_seed}

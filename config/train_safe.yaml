@@ -1,10 +1,10 @@
 defaults:
-    - agent: sac
+    - agent: sacCBF # sac
 
-env: cheetah_run
+env: safePendulum #cheetah_run
 
 # this needs to be specified manually
-experiment: test_exp
+experiment: safeswingup #test_exp
 
 num_train_steps: 1e6
 replay_buffer_capacity: ${num_train_steps}
@@ -24,6 +24,8 @@ log_save_tb: true
 save_video: true
 
 force_reset_env: true # false
+safe_pre_seed: true # If True then use safety filter on pre-seed data
+
 
 seed: 1
 
@@ -32,4 +34,4 @@ seed: 1
 hydra:
     name: ${env}
     run:
-        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_reset${force_reset_env}
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${env}_${agent.name}_${experiment}_${seed}_${agent.params.cbf_alpha_value}_reset${force_reset_env}_sp${safe_pre_seed}
